@@ -514,13 +514,13 @@ class NDR_API_Template_Manager
         if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ndr_tpl_import_nonce'])) {
             check_admin_referer('ndr_tpl_import_action', 'ndr_tpl_import_nonce');
             if (empty($_FILES['ndr_tpl_import_file']['tmp_name'])) {
-                wp_safe_redirect(add_query_arg(array('post_type' => 'ndr_api_template', 'ndr_tpl_err' => 'no_file'), admin_url('edit.php')));
+                wp_safe_redirect(add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-data-settings', 'ndr_tpl_err' => 'no_file'), admin_url('edit.php')));
                 exit;
             }
             $raw = file_get_contents($_FILES['ndr_tpl_import_file']['tmp_name']);
             $json = json_decode((string) $raw, true);
             if (json_last_error() !== JSON_ERROR_NONE || ! is_array($json)) {
-                wp_safe_redirect(add_query_arg(array('post_type' => 'ndr_api_template', 'ndr_tpl_err' => 'bad_json'), admin_url('edit.php')));
+                wp_safe_redirect(add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-data-settings', 'ndr_tpl_err' => 'bad_json'), admin_url('edit.php')));
                 exit;
             }
 
@@ -540,7 +540,7 @@ class NDR_API_Template_Manager
                     }
                 }
             }
-            wp_safe_redirect(add_query_arg(array('post_type' => 'ndr_api_template', 'ndr_tpl_msg' => 'imported', 'imp_cnt' => $imported), admin_url('edit.php')));
+            wp_safe_redirect(add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-data-settings', 'ndr_msg' => 'tpl_imported', 'imp_cnt' => $imported), admin_url('edit.php')));
             exit;
         }
     }
@@ -565,16 +565,6 @@ class NDR_API_Template_Manager
         } elseif ($err === 'bad_json') {
             echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Geçersiz şablon JSON dosyası.', 'ndr-rest-api-to-render') . '</p></div>';
         }
-        ?>
-        <div style="background:#fff;border:1px solid #dcdcde;border-left:4px solid #2271b1;border-radius:4px;padding:10px 14px;margin:12px 18px 8px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-            <form method="post" enctype="multipart/form-data" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <?php wp_nonce_field('ndr_tpl_import_action', 'ndr_tpl_import_nonce'); ?>
-                <strong><?php esc_html_e('Şablon İçe Aktar (JSON):', 'ndr-rest-api-to-render'); ?></strong>
-                <input type="file" name="ndr_tpl_import_file" accept=".json,application/json" required />
-                <button type="submit" class="button button-primary button-small"><?php esc_html_e('İçe Aktar', 'ndr-rest-api-to-render'); ?></button>
-            </form>
-            <span class="description"><?php esc_html_e('Tekli veya toplu dışa aktarılmış .json şablon dosyalarını yükleyebilirsiniz.', 'ndr-rest-api-to-render'); ?></span>
-        </div>
-        <?php
+
     }
 }

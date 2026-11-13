@@ -83,6 +83,22 @@ class NDR_API_Settings_Page
                 <div class="notice notice-success is-dismissible"><p><?php esc_html_e('Ayarlar başarıyla kaydedildi.', 'ndr-rest-api-to-render'); ?></p></div>
             <?php elseif ($msg === 'cache_cleared') : ?>
                 <div class="notice notice-success is-dismissible"><p><?php esc_html_e('Tüm API önbelleği temizlendi.', 'ndr-rest-api-to-render'); ?></p></div>
+            <?php elseif ($msg === 'tpl_imported') :
+                $cnt = absint($_GET['imp_cnt'] ?? 0);
+            ?>
+                <div class="notice notice-success is-dismissible">
+                    <p>
+                        <?php echo esc_html(sprintf(__('%d adet şablon başarıyla içe aktarıldı.', 'ndr-rest-api-to-render'), $cnt)); ?>
+                        &mdash; <a href="<?php echo esc_url(admin_url('edit.php?post_type=ndr_api_template')); ?>"><?php esc_html_e('Şablonları Görüntüle', 'ndr-rest-api-to-render'); ?></a>
+                    </p>
+                </div>
+            <?php endif; ?>
+            <?php
+            $tpl_err = sanitize_text_field(wp_unslash($_GET['ndr_tpl_err'] ?? ''));
+            if ($tpl_err === 'no_file') : ?>
+                <div class="notice notice-error is-dismissible"><p><?php esc_html_e('Lütfen bir JSON dosyası seçin.', 'ndr-rest-api-to-render'); ?></p></div>
+            <?php elseif ($tpl_err === 'bad_json') : ?>
+                <div class="notice notice-error is-dismissible"><p><?php esc_html_e('Geçersiz şablon JSON dosyası.', 'ndr-rest-api-to-render'); ?></p></div>
             <?php endif; ?>
 
             <form method="post" action="">
@@ -138,6 +154,16 @@ class NDR_API_Settings_Page
 
                 <?php submit_button(__('Ayarları Kaydet', 'ndr-rest-api-to-render')); ?>
             </form>
+
+            <div style="background:#fff;border:1px solid #dcdcde;border-left:4px solid #2271b1;border-radius:6px;padding:16px 20px;margin:20px 0;">
+                <h2 style="margin-top:0;"><?php esc_html_e('Şablon İçe Aktar (JSON)', 'ndr-rest-api-to-render'); ?></h2>
+                <p class="description"><?php esc_html_e('Başka bir siteden veya yedekten dışa aktardığınız tekli ya da toplu .json şablon dosyasını buradan yükleyebilirsiniz.', 'ndr-rest-api-to-render'); ?></p>
+                <form method="post" enctype="multipart/form-data" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;">
+                    <?php wp_nonce_field('ndr_tpl_import_action', 'ndr_tpl_import_nonce'); ?>
+                    <input type="file" name="ndr_tpl_import_file" accept=".json,application/json" required />
+                    <button type="submit" class="button button-primary"><?php esc_html_e('Şablonu İçe Aktar', 'ndr-rest-api-to-render'); ?></button>
+                </form>
+            </div>
         </div>
         <?php
     }
