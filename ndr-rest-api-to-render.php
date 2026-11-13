@@ -3,7 +3,7 @@
 /**
  * Plugin Name: NDR-DataList
  * Description: Multiple API data sources with templates, CSS, JS and shortcodes.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Nadir Atmaca
  * Text Domain: ndr-rest-api-to-render
  */
@@ -16,6 +16,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-ndr-template-manager.ph
 require_once plugin_dir_path(__FILE__) . 'includes/class-ndr-frontend-renderer.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-ndr-data-source-manager.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-ndr-settings-page.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-ndr-file-manager.php';
 
 if (! class_exists('NDR_REST_API_To_Render')) {
     class NDR_REST_API_To_Render
@@ -80,7 +81,8 @@ if (! class_exists('NDR_REST_API_To_Render')) {
                     'edit.php?post_type=gs_sheet_manager' => 1,
                     'edit.php?post_type=ndr_api_source'   => 2,
                     'edit.php?post_type=ndr_api_template' => 3,
-                    'ndr-data-settings'                   => 4,
+                    'ndr-file-manager'                    => 4,
+                    'ndr-data-settings'                   => 5,
                 );
                 usort($submenu[$parent], function ($a, $b) use ($order) {
                     $pa = $order[$a[2]] ?? 99;
@@ -1159,5 +1161,6 @@ JS;
     new GS_Sheet_Manager();
     new NDR_API_Template_Manager();
     new NDR_API_Settings_Page();
+    new NDR_API_File_Manager();
     new NDR_REST_API_To_Render();
 }

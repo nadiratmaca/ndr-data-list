@@ -32,6 +32,7 @@ class NDR_API_Settings_Page
             'global_js'           => '',
             'default_empty_msg'   => 'Gösterilecek veri bulunamadı.',
             'default_search_ph'   => 'Ara...',
+            'fm_root_dir'         => 'wp-content/uploads/ndr-files',
         );
         $saved = get_option('ndr_data_settings', array());
         return wp_parse_args(is_array($saved) ? $saved : array(), $defaults);
@@ -63,6 +64,7 @@ class NDR_API_Settings_Page
             'global_js'         => wp_unslash($_POST['global_js'] ?? ''),
             'default_empty_msg' => sanitize_text_field(wp_unslash($_POST['default_empty_msg'] ?? 'Gösterilecek veri bulunamadı.')),
             'default_search_ph' => sanitize_text_field(wp_unslash($_POST['default_search_ph'] ?? 'Ara...')),
+            'fm_root_dir'       => trim(sanitize_text_field(wp_unslash($_POST['fm_root_dir'] ?? 'wp-content/uploads/ndr-files'))),
         );
         update_option('ndr_data_settings', $settings);
         wp_redirect(add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-data-settings', 'ndr_msg' => 'saved'), admin_url('edit.php')));
@@ -110,6 +112,15 @@ class NDR_API_Settings_Page
                     <p>
                         <label for="ndr_global_js"><strong><?php esc_html_e('Genel JS', 'ndr-rest-api-to-render'); ?></strong></label>
                         <textarea id="ndr_global_js" name="global_js" rows="8" class="widefat ndr-code-editor" data-mode="javascript"><?php echo esc_textarea($s['global_js']); ?></textarea>
+                    </p>
+                </div>
+
+                <div style="background:#fff;border:1px solid #dcdcde;border-radius:6px;padding:16px 20px;margin:16px 0;">
+                    <h2 style="margin-top:0;"><?php esc_html_e('Dosya Yöneticisi Ayarları', 'ndr-rest-api-to-render'); ?></h2>
+                    <p>
+                        <label for="ndr_fm_root_dir"><strong><?php esc_html_e('Kök Dizin (WordPress Ana Dizinine Göre)', 'ndr-rest-api-to-render'); ?></strong></label><br />
+                        <input type="text" id="ndr_fm_root_dir" name="fm_root_dir" class="regular-text" style="min-width:360px;font-family:monospace;" value="<?php echo esc_attr($s['fm_root_dir']); ?>" placeholder="wp-content/uploads/ndr-files" />
+                        <br /><span class="description"><?php esc_html_e('Örnek: wp-content/uploads/ndr-files veya wp-content/uploads (WordPress ana dizini dışına çıkılamaz).', 'ndr-rest-api-to-render'); ?></span>
                     </p>
                 </div>
 
