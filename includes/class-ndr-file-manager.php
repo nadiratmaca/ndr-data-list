@@ -583,7 +583,20 @@ class NDR_API_File_Manager
         ?>
         <style>
             .ndr-fm-bar{background:#fff;border:1px solid #dcdcde;border-radius:6px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
-            .ndr-fm-table th,.ndr-fm-table td{vertical-align:middle !important;padding:7px 10px !important;}
+            .ndr-fm-table th,.ndr-fm-table td{vertical-align:middle !important;padding:5px 10px !important;line-height:1.35;}
+            .ndr-fm-actions-cell{position:relative;text-align:right;}
+            .ndr-fm-menu-wrap{position:relative;display:inline-block;}
+            .ndr-fm-menu-trigger{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;font-size:12px;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;color:#2c3338;}
+            .ndr-fm-menu-trigger:hover{border-color:#2271b1;color:#2271b1;background:#f0f6fc;}
+            .ndr-fm-dropdown{display:none;position:absolute;right:0;top:100%;min-width:175px;background:#fff;border:1px solid #dcdcde;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.14);z-index:9999;padding:4px 0;text-align:left;}
+            .ndr-fm-menu-wrap:hover .ndr-fm-dropdown,.ndr-fm-menu-wrap.is-open .ndr-fm-dropdown{display:block;}
+            .ndr-fm-ctx-menu{display:none;position:fixed;min-width:185px;background:#fff;border:1px solid #dcdcde;border-radius:6px;box-shadow:0 10px 28px rgba(0,0,0,.18);z-index:999999;padding:5px 0;}
+            .ndr-fm-ctx-menu.is-open{display:block;}
+            .ndr-fm-menu-item{display:flex;align-items:center;gap:8px;width:100%;padding:6px 12px;border:none;background:transparent;text-align:left;font-size:12.5px;color:#1d2327;cursor:pointer;text-decoration:none;box-sizing:border-box;}
+            .ndr-fm-menu-item:hover{background:#f0f6fc;color:#2271b1;}
+            .ndr-fm-menu-item.is-danger{color:#b32d2e;}
+            .ndr-fm-menu-item.is-danger:hover{background:#fcf0f1;color:#b32d2e;}
+            .ndr-fm-menu-item .dashicons{font-size:15px;width:15px;height:15px;line-height:15px;}
             .ndr-fm-name-cell{display:flex;align-items:center;gap:8px;}
             .ndr-fm-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;color:#3c434a;text-decoration:none;transition:all .15s;}
             .ndr-fm-icon-btn:hover{border-color:#2271b1;color:#2271b1;background:#f0f6fc;}
@@ -732,7 +745,7 @@ class NDR_API_File_Manager
                             <th style="width:130px;"><?php echo $sort_link('type', 'Tür'); ?></th>
                             <th style="width:100px;"><?php echo $sort_link('size', 'Boyut'); ?></th>
                             <th style="width:145px;"><?php echo $sort_link('date', 'Değiştirilme'); ?></th>
-                            <th style="width:245px;"><?php esc_html_e('İşlemler', 'ndr-rest-api-to-render'); ?></th>
+                            <th style="width:105px;text-align:right;"><?php esc_html_e('İşlemler', 'ndr-rest-api-to-render'); ?></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -749,7 +762,16 @@ class NDR_API_File_Manager
                             $dl_u    = wp_nonce_url(add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-file-manager', 'dir' => $rel_dir, 'fm_download' => $r['rel']), admin_url('edit.php')), 'ndr_fm_download');
                             $ed_u    = add_query_arg(array_merge($base_page_args, array('edit' => $r['rel'])), admin_url('edit.php'));
                         ?>
-                            <tr>
+                            <tr class="ndr-fm-row"
+                                data-rel="<?php echo esc_attr($r['rel']); ?>"
+                                data-name="<?php echo esc_attr($r['name']); ?>"
+                                data-is-dir="<?php echo $r['is_dir'] ? '1' : '0'; ?>"
+                                data-is-img="<?php echo $info['is_img'] ? '1' : '0'; ?>"
+                                data-is-edit="<?php echo $info['is_edit'] ? '1' : '0'; ?>"
+                                data-is-zip="<?php echo (! $r['is_dir'] && strtolower(pathinfo($r['name'], PATHINFO_EXTENSION)) === 'zip') ? '1' : '0'; ?>"
+                                data-pub-url="<?php echo esc_attr($pub_url); ?>"
+                                data-dl-url="<?php echo esc_attr($dl_u); ?>"
+                                data-ed-url="<?php echo esc_attr($ed_u); ?>">
                                 <td><input type="checkbox" name="selected_items[]" value="<?php echo esc_attr($r['rel']); ?>" data-size="<?php echo esc_attr($r['size']); ?>" class="ndr-fm-cb" /></td>
                                 <td>
                                     <div class="ndr-fm-name-cell">
@@ -773,27 +795,30 @@ class NDR_API_File_Manager
                                 <td><span style="font-size:12px;color:#50575e;"><?php echo esc_html($r['type']); ?></span></td>
                                 <td><?php echo $r['is_dir'] ? '—' : esc_html(size_format($r['size'])); ?></td>
                                 <td><span style="font-size:12px;"><?php echo esc_html(date_i18n('d.m.Y H:i', $r['mtime'])); ?></span></td>
-                                <td>
-                                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
-                                        <?php if ($info['is_img'] && $pub_url) : ?>
-                                            <a href="<?php echo esc_url($pub_url); ?>" class="ndr-fm-icon-btn ndr-fm-img-preview" data-title="<?php echo esc_attr($r['name']); ?>" title="Önizle"><span class="dashicons dashicons-visibility"></span></a>
-                                        <?php endif; ?>
-                                        <?php if ($info['is_edit']) : ?>
-                                            <a href="<?php echo esc_url($ed_u); ?>" class="ndr-fm-icon-btn" title="Düzenle"><span class="dashicons dashicons-edit"></span></a>
-                                        <?php endif; ?>
-                                        <?php if (! $r['is_dir']) : ?>
-                                            <a href="<?php echo esc_url($dl_u); ?>" class="ndr-fm-icon-btn" title="İndir"><span class="dashicons dashicons-download"></span></a>
-                                        <?php endif; ?>
-                                        <?php if ($pub_url) : ?>
-                                            <button type="button" class="ndr-fm-icon-btn ndr-fm-copy-url" data-url="<?php echo esc_attr($pub_url); ?>" title="URL Kopyala"><span class="dashicons dashicons-admin-links"></span></button>
-                                        <?php endif; ?>
-                                        <?php if (! $r['is_dir'] && strtolower(pathinfo($r['name'], PATHINFO_EXTENSION)) === 'zip') : ?>
-                                            <button type="button" class="ndr-fm-icon-btn ndr-fm-unzip-btn" data-name="<?php echo esc_attr($r['rel']); ?>" title="ZIP Aç"><span class="dashicons dashicons-open-folder"></span></button>
-                                        <?php endif; ?>
-                                        <button type="button" class="ndr-fm-icon-btn ndr-fm-copymove-btn" data-mode="copy" data-name="<?php echo esc_attr($r['rel']); ?>" title="Kopyala"><span class="dashicons dashicons-admin-page"></span></button>
-                                        <button type="button" class="ndr-fm-icon-btn ndr-fm-copymove-btn" data-mode="move" data-name="<?php echo esc_attr($r['rel']); ?>" title="Taşı"><span class="dashicons dashicons-migrate"></span></button>
-                                        <button type="button" class="ndr-fm-icon-btn ndr-fm-rename-btn" data-name="<?php echo esc_attr($r['rel']); ?>" data-short="<?php echo esc_attr($r['name']); ?>" title="Yeniden Adlandır"><span class="dashicons dashicons-tag"></span></button>
-                                        <button type="button" class="ndr-fm-icon-btn is-danger ndr-fm-del-btn" data-name="<?php echo esc_attr($r['rel']); ?>" data-short="<?php echo esc_attr($r['name']); ?>" title="Sil"><span class="dashicons dashicons-trash"></span></button>
+                                <td class="ndr-fm-actions-cell">
+                                    <div class="ndr-fm-menu-wrap">
+                                        <button type="button" class="ndr-fm-menu-trigger">İşlemler &#9662;</button>
+                                        <div class="ndr-fm-dropdown">
+                                            <?php if ($info['is_img'] && $pub_url) : ?>
+                                                <a href="<?php echo esc_url($pub_url); ?>" class="ndr-fm-menu-item ndr-fm-img-preview" data-title="<?php echo esc_attr($r['name']); ?>"><span class="dashicons dashicons-visibility"></span> Önizle</a>
+                                            <?php endif; ?>
+                                            <?php if ($info['is_edit']) : ?>
+                                                <a href="<?php echo esc_url($ed_u); ?>" class="ndr-fm-menu-item"><span class="dashicons dashicons-edit"></span> Düzenle</a>
+                                            <?php endif; ?>
+                                            <?php if (! $r['is_dir']) : ?>
+                                                <a href="<?php echo esc_url($dl_u); ?>" class="ndr-fm-menu-item"><span class="dashicons dashicons-download"></span> İndir</a>
+                                            <?php endif; ?>
+                                            <?php if ($pub_url) : ?>
+                                                <button type="button" class="ndr-fm-menu-item ndr-fm-copy-url" data-url="<?php echo esc_attr($pub_url); ?>"><span class="dashicons dashicons-admin-links"></span> URL Kopyala</button>
+                                            <?php endif; ?>
+                                            <?php if (! $r['is_dir'] && strtolower(pathinfo($r['name'], PATHINFO_EXTENSION)) === 'zip') : ?>
+                                                <button type="button" class="ndr-fm-menu-item ndr-fm-unzip-btn" data-name="<?php echo esc_attr($r['rel']); ?>"><span class="dashicons dashicons-open-folder"></span> ZIP Aç</button>
+                                            <?php endif; ?>
+                                            <button type="button" class="ndr-fm-menu-item ndr-fm-copymove-btn" data-mode="copy" data-name="<?php echo esc_attr($r['rel']); ?>"><span class="dashicons dashicons-admin-page"></span> Kopyala</button>
+                                            <button type="button" class="ndr-fm-menu-item ndr-fm-copymove-btn" data-mode="move" data-name="<?php echo esc_attr($r['rel']); ?>"><span class="dashicons dashicons-migrate"></span> Taşı</button>
+                                            <button type="button" class="ndr-fm-menu-item ndr-fm-rename-btn" data-name="<?php echo esc_attr($r['rel']); ?>" data-short="<?php echo esc_attr($r['name']); ?>"><span class="dashicons dashicons-tag"></span> Ad Değiştir</button>
+                                            <button type="button" class="ndr-fm-menu-item is-danger ndr-fm-del-btn" data-name="<?php echo esc_attr($r['rel']); ?>" data-short="<?php echo esc_attr($r['name']); ?>"><span class="dashicons dashicons-trash"></span> Sil</button>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -831,6 +856,9 @@ class NDR_API_File_Manager
                 <input type="hidden" name="old_name" id="ndr-fm-single-old" value="" />
                 <input type="hidden" name="new_name" id="ndr-fm-single-new" value="" />
             </form>
+
+            <!-- Right-click Context Menu -->
+            <div class="ndr-fm-ctx-menu" id="ndr-fm-ctx-menu"></div>
 
             <!-- Image Preview Modal -->
             <div class="ndr-fm-modal-bg" id="ndr-fm-img-modal">
@@ -939,14 +967,14 @@ class NDR_API_File_Manager
                 });
 
                 // Single Actions
-                $('.ndr-fm-del-btn').on('click', function(){
+                $(document).on('click', '.ndr-fm-del-btn', function(){
                     var name = $(this).data('name'), sh = $(this).data('short');
                     if (!confirm(sh + ' silinsin mi?')) return;
                     $('#ndr-fm-single-action').val('delete_one');
                     $('#ndr-fm-single-target').val(name);
                     $('#ndr-fm-single-form').submit();
                 });
-                $('.ndr-fm-unzip-btn').on('click', function(){
+                $(document).on('click', '.ndr-fm-unzip-btn', function(){
                     var name = $(this).data('name');
                     if (!confirm(name + ' arşivi açılsın mı?')) return;
                     $('#ndr-fm-progress-wrap').show();
@@ -956,7 +984,7 @@ class NDR_API_File_Manager
                     $('#ndr-fm-single-target').val(name);
                     $('#ndr-fm-single-form').submit();
                 });
-                $('.ndr-fm-rename-btn').on('click', function(){
+                $(document).on('click', '.ndr-fm-rename-btn', function(){
                     var oldRel = $(this).data('name'), sh = $(this).data('short');
                     var newName = prompt('Yeni ad:', sh);
                     if (!newName || newName === sh) return;
@@ -965,7 +993,7 @@ class NDR_API_File_Manager
                     $('#ndr-fm-single-new').val(newName);
                     $('#ndr-fm-single-form').submit();
                 });
-                $('.ndr-fm-copy-url').on('click', function(){
+                $(document).on('click', '.ndr-fm-copy-url', function(){
                     var $b = $(this), u = $b.data('url');
                     if (navigator.clipboard) navigator.clipboard.writeText(u);
                     $b.css('color', '#00a32a');
@@ -973,7 +1001,7 @@ class NDR_API_File_Manager
                 });
 
                 // Image Preview Modal
-                $('.ndr-fm-img-preview').on('click', function(e){
+                $(document).on('click', '.ndr-fm-img-preview', function(e){
                     e.preventDefault();
                     var url = $(this).attr('href'), t = $(this).data('title');
                     $('#ndr-fm-img-title').text(t);
@@ -987,7 +1015,7 @@ class NDR_API_File_Manager
 
                 // Single Copy/Move Modal
                 var cmMode = '', cmTarget = '';
-                $('.ndr-fm-copymove-btn').on('click', function(){
+                $(document).on('click', '.ndr-fm-copymove-btn', function(){
                     cmMode = $(this).data('mode');
                     cmTarget = $(this).data('name');
                     $('#ndr-fm-cm-title').text((cmMode === 'copy' ? 'Kopyala: ' : 'Taşı: ') + cmTarget);
@@ -999,6 +1027,33 @@ class NDR_API_File_Manager
                     $('#ndr-fm-single-target').val(cmTarget);
                     $('#ndr-fm-single-tdir').val($('#ndr-fm-cm-select').val());
                     $('#ndr-fm-single-form').submit();
+                });
+                // Right-click context menu on table rows
+                var $ctx = $('#ndr-fm-ctx-menu');
+                $(document).on('contextmenu', 'tr.ndr-fm-row', function(e){
+                    e.preventDefault();
+                    var $menuHtml = $(this).find('.ndr-fm-dropdown').html();
+                    $ctx.html($menuHtml).addClass('is-open');
+                    var x = Math.min(e.clientX, window.innerWidth - 200);
+                    var y = Math.min(e.clientY, window.innerHeight - $ctx.outerHeight() - 10);
+                    $ctx.css({ left: x + 'px', top: y + 'px' });
+                });
+                $(document).on('click', function(e){
+                    if (!$(e.target).closest('#ndr-fm-ctx-menu').length) {
+                        $ctx.removeClass('is-open');
+                    }
+                    if (!$(e.target).closest('.ndr-fm-menu-wrap').length) {
+                        $('.ndr-fm-menu-wrap').removeClass('is-open');
+                    }
+                });
+                $(document).on('click', '.ndr-fm-menu-trigger', function(e){
+                    e.stopPropagation();
+                    var $w = $(this).closest('.ndr-fm-menu-wrap');
+                    $('.ndr-fm-menu-wrap').not($w).removeClass('is-open');
+                    $w.toggleClass('is-open');
+                });
+                $(document).on('click', '#ndr-fm-ctx-menu .ndr-fm-menu-item', function(){
+                    $ctx.removeClass('is-open');
                 });
             });
             </script>
