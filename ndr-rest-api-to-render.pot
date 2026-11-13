@@ -1,0 +1,146 @@
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: NDR REST API to Render\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-02 21:40+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: \n"
+"Language: \n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Loco https://localise.biz/\n"
+"X-Loco-Version: 2.8.9; wp-7.1.4; php-8.4.27\n"
+"X-Domain: ndr-rest-api-to-render"
+
+#: ndr-rest-api-to-render.php:34
+msgid "API Kaynakları"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:35
+msgid "API Kaynağı"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:40
+msgid "API Kaynağı Ara"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:41
+msgid "API kaynağı bulunamadı."
+msgstr ""
+
+#: ndr-rest-api-to-render.php:37
+msgid "API Kaynağını Düzenle"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:39
+msgid "API Kaynağını Görüntüle"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:282
+msgid "API URL"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:285
+msgid "API URL girildiğinde değişkenler burada görünecek."
+msgstr ""
+
+#: ndr-rest-api-to-render.php:322
+msgid "Arama kutusunu göster"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:338
+msgid "Boş Durum Mesajı"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:311
+msgid "Ek CSS"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:316
+msgid "Ek JS"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:326
+msgid "Filtre Alanı"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:275 ndr-rest-api-to-render.php:608
+msgid "Filtre etmek için değer girin"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:332
+msgid "Filtre Placeholder"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:542
+msgid "Geçerli bir API kaynağı bulunamadı."
+msgstr ""
+
+#: ndr-rest-api-to-render.php:278 ndr-rest-api-to-render.php:605
+msgid "Gösterilecek veri bulunamadı."
+msgstr ""
+
+#: ndr-rest-api-to-render.php:295
+msgid "Hazır Grid Şablonu"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:293
+msgid "Hazır Kart Şablonu"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:297
+msgid "Hazır Tablo Şablonu"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:64
+msgid "Kaynak Ayarları"
+msgstr ""
+
+#. Description of the plugin
+msgid "Multiple API data sources with templates, CSS, JS and shortcodes."
+msgstr ""
+
+#. Author of the plugin
+msgid "Nadir Atmaca"
+msgstr ""
+
+#. Name of the plugin
+msgid "NDR REST API to Render"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:343 ndr-rest-api-to-render.php:421
+msgid "Shortcode"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:649
+msgid "Tümü"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:38
+msgid "Yeni API Kaynağı"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:36
+msgid "Yeni API Kaynağı Ekle"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:299
+msgid "Özel HTML"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:306
+msgid "Özel HTML Şablonu"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:290
+msgid "Şablon Tipi"
+msgstr ""
+
+#: ndr-rest-api-to-render.php:302
+msgid ""
+"Şablonda değişken olarak {{title}} veya ${item.title} kullanabilirsiniz."
+msgstr ""
