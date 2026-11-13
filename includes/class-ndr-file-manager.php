@@ -53,7 +53,7 @@ class NDR_API_File_Manager
         $absp = rtrim(realpath(ABSPATH), '/');
         if ($absp && strpos($root, $absp) === 0) {
             $rel = ltrim(substr($root, strlen($absp)), '/');
-            return untrailingslashit(trailingslashit(site_url('/')) . str_replace('%2F', '/', rawurlencode($rel)));
+            return untrailingslashit(trailingslashit(is_multisite() ? network_site_url('/') : site_url('/')) . str_replace('%2F', '/', rawurlencode($rel)));
         }
         return '';
     }
@@ -84,7 +84,7 @@ class NDR_API_File_Manager
         $absp = rtrim(realpath(ABSPATH), '/');
         if (strpos($abs_path, $absp) === 0) {
             $rel = ltrim(substr($abs_path, strlen($absp)), '/');
-            return trailingslashit(site_url('/')) . str_replace('%2F', '/', rawurlencode($rel));
+            return trailingslashit(is_multisite() ? network_site_url('/') : site_url('/')) . str_replace('%2F', '/', rawurlencode($rel));
         }
         return '';
     }

@@ -95,6 +95,75 @@ class NDR_API_Frontend_Renderer
         return $out;
     }
 
+    public static function get_ui_strings()
+    {
+        $locale = function_exists('get_locale') ? get_locale() : 'tr_TR';
+        if (strpos($locale, 'en') === 0) {
+            return array(
+                'search'        => 'Search',
+                'search_ph'     => 'Search...',
+                'all'           => 'All',
+                'sort'          => 'Sort',
+                'default'       => 'Default',
+                'asc'           => 'A to Z',
+                'desc'          => 'Z to A',
+                'view'          => 'View',
+                'list'          => 'List',
+                'grid'          => 'Grid',
+                'table'         => 'Table',
+                'apply'         => 'Apply',
+                'clear'         => 'Clear',
+                'empty'         => 'No records found.',
+                'stats_all'     => 'Showing <strong>%d</strong> items.',
+                'stats_filtered'=> 'Showing <strong>%2$d</strong> of <strong>%1$d</strong> items.',
+                'stats_all_js'  => 'Showing <strong>{total}</strong> items.',
+                'stats_flt_js'  => 'Showing <strong>{shown}</strong> of <strong>{total}</strong> items.',
+            );
+        }
+        if (strpos($locale, 'pt') === 0) {
+            return array(
+                'search'        => 'Pesquisar',
+                'search_ph'     => 'Pesquisar...',
+                'all'           => 'Todos',
+                'sort'          => 'Ordenar',
+                'default'       => 'Predefinido',
+                'asc'           => 'A a Z',
+                'desc'          => 'Z a A',
+                'view'          => 'Vista',
+                'list'          => 'Lista',
+                'grid'          => 'Grelha',
+                'table'         => 'Tabela',
+                'apply'         => 'Aplicar',
+                'clear'         => 'Limpar',
+                'empty'         => 'Nenhum registo encontrado.',
+                'stats_all'     => 'A apresentar <strong>%d</strong> registos.',
+                'stats_filtered'=> 'A apresentar <strong>%2$d</strong> de <strong>%1$d</strong> registos.',
+                'stats_all_js'  => 'A apresentar <strong>{total}</strong> registos.',
+                'stats_flt_js'  => 'A apresentar <strong>{shown}</strong> de <strong>{total}</strong> registos.',
+            );
+        }
+        return array(
+            'search'        => 'Arama',
+            'search_ph'     => 'Ara...',
+            'all'           => 'Tümü',
+            'sort'          => 'Sıralama',
+            'default'       => 'Varsayılan',
+            'asc'           => "A'dan Z'ye",
+            'desc'          => "Z'den A'ya",
+            'view'          => 'Görünüm',
+            'list'          => 'Liste',
+            'grid'          => 'Grid',
+            'table'         => 'Tablo',
+            'apply'         => 'Uygula',
+            'clear'         => 'Temizle',
+            'empty'         => 'Gösterilecek veri bulunamadı.',
+            'stats_all'     => 'Toplam <strong>%d</strong> kayıt listeleniyor.',
+            'stats_filtered'=> 'Toplam <strong>%1$d</strong> kayıt arasından <strong>%2$d</strong> sonuç gösteriliyor.',
+            'stats_all_js'  => 'Toplam <strong>{total}</strong> kayıt listeleniyor.',
+            'stats_flt_js'  => 'Toplam <strong>{total}</strong> kayıt arasından <strong>{shown}</strong> sonuç gösteriliyor.',
+        );
+    }
+
     public static function get_global_vars()
     {
         $settings = class_exists('NDR_API_Settings_Page') ? NDR_API_Settings_Page::get_settings() : array();
@@ -318,6 +387,7 @@ class NDR_API_Frontend_Renderer
             });
         }
 
+        $ui = self::get_ui_strings();
         $wrapper_id = 'ndr-render-' . $post->ID . '-' . wp_generate_uuid4();
         $has_controls = $cfg['enable_search'] || ($cfg['enable_filters'] && ! empty($cfg['filters'])) || $cfg['enable_sort'] || $cfg['enable_view_switch'];
         $pos = $cfg['controls_position'];
@@ -407,7 +477,7 @@ class NDR_API_Frontend_Renderer
                         <form method="get" class="ndr-controls-form">
                             <?php if ($cfg['enable_search']) : ?>
                                 <div class="ndr-ctrl-group ndr-ctrl-search">
-                                    <label class="ndr-ctrl-label"><?php esc_html_e('Arama', 'ndr-rest-api-to-render'); ?></label>
+                                    <label class="ndr-ctrl-label"><?php echo esc_html($ui['search']); ?></label>
                                     <input type="search" name="ndr_q" class="ndr-ctrl-input ndr-js-search" value="<?php echo esc_attr($q_param); ?>" placeholder="<?php echo esc_attr($cfg['search_placeholder'] ?: 'Ara...'); ?>" />
                                 </div>
                             <?php endif; ?>
@@ -425,7 +495,7 @@ class NDR_API_Frontend_Renderer
                                         <label class="ndr-ctrl-label"><?php echo esc_html($f_label); ?></label>
                                         <?php if ($f_type === 'dropdown') : ?>
                                             <select name="<?php echo esc_attr($p_name); ?>" class="ndr-ctrl-select ndr-js-filter" data-field="<?php echo esc_attr($f_field); ?>">
-                                                <option value=""><?php esc_html_e('Tümü', 'ndr-rest-api-to-render'); ?></option>
+                                                <option value=""><?php echo esc_html($ui['all']); ?></option>
                                                 <?php foreach ($opts as $opt) : ?>
                                                     <option value="<?php echo esc_attr($opt); ?>" <?php selected(in_array($opt, $sel, true)); ?>><?php echo esc_html($opt); ?></option>
                                                 <?php endforeach; ?>
@@ -434,7 +504,7 @@ class NDR_API_Frontend_Renderer
                                             <div class="ndr-check-list">
                                                 <label class="ndr-check-item">
                                                     <input type="radio" name="<?php echo esc_attr($p_name); ?>" class="ndr-js-filter" data-field="<?php echo esc_attr($f_field); ?>" value="" <?php checked(empty($sel)); ?> />
-                                                    <span><?php esc_html_e('Tümü', 'ndr-rest-api-to-render'); ?></span>
+                                                    <span><?php echo esc_html($ui['all']); ?></span>
                                                 </label>
                                                 <?php foreach ($opts as $opt) : ?>
                                                     <label class="ndr-check-item">
@@ -459,20 +529,20 @@ class NDR_API_Frontend_Renderer
 
                             <?php if ($cfg['enable_sort']) : ?>
                                 <div class="ndr-ctrl-group ndr-ctrl-sort">
-                                    <label class="ndr-ctrl-label"><?php esc_html_e('Sıralama', 'ndr-rest-api-to-render'); ?></label>
+                                    <label class="ndr-ctrl-label"><?php echo esc_html($ui['sort']); ?></label>
                                     <select name="ndr_sort" class="ndr-ctrl-select ndr-js-sort">
-                                        <option value="none" <?php selected($sort_param, 'none'); ?>><?php esc_html_e('Varsayılan', 'ndr-rest-api-to-render'); ?></option>
-                                        <option value="asc" <?php selected($sort_param, 'asc'); ?>><?php esc_html_e("A'dan Z'ye", 'ndr-rest-api-to-render'); ?></option>
-                                        <option value="desc" <?php selected($sort_param, 'desc'); ?>><?php esc_html_e("Z'den A'ya", 'ndr-rest-api-to-render'); ?></option>
+                                        <option value="none" <?php selected($sort_param, 'none'); ?>><?php echo esc_html($ui['default']); ?></option>
+                                        <option value="asc" <?php selected($sort_param, 'asc'); ?>><?php echo esc_html($ui['asc']); ?></option>
+                                        <option value="desc" <?php selected($sort_param, 'desc'); ?>><?php echo esc_html($ui['desc']); ?></option>
                                     </select>
                                 </div>
                             <?php endif; ?>
 
                             <?php if ($cfg['enable_view_switch']) :
-                                $view_labels = array('list' => 'Liste', 'grid' => 'Grid', 'table' => 'Tablo');
+                                $view_labels = array('list' => $ui['list'], 'grid' => $ui['grid'], 'table' => $ui['table']);
                             ?>
                                 <div class="ndr-ctrl-group ndr-ctrl-view" style="flex:0 0 auto;min-width:auto;">
-                                    <label class="ndr-ctrl-label"><?php esc_html_e('Görünüm', 'ndr-rest-api-to-render'); ?></label>
+                                    <label class="ndr-ctrl-label"><?php echo esc_html($ui['view']); ?></label>
                                     <input type="hidden" name="ndr_view" class="ndr-js-view-input" value="<?php echo esc_attr($view_param); ?>" />
                                     <div class="ndr-view-switcher">
                                         <?php foreach ($cfg['allowed_views'] as $vw) : ?>
@@ -487,10 +557,10 @@ class NDR_API_Frontend_Renderer
                             <?php if (! empty($cfg['show_apply_btn']) || ! empty($cfg['show_reset_btn'])) : ?>
                                 <div class="ndr-ctrl-actions">
                                     <?php if (! empty($cfg['show_apply_btn'])) : ?>
-                                        <button type="submit" class="ndr-btn-apply"><?php esc_html_e('Uygula', 'ndr-rest-api-to-render'); ?></button>
+                                        <button type="submit" class="ndr-btn-apply"><?php echo esc_html($ui['apply']); ?></button>
                                     <?php endif; ?>
                                     <?php if (! empty($cfg['show_reset_btn'])) : ?>
-                                        <button type="button" class="ndr-btn-reset ndr-js-reset"><?php esc_html_e('Temizle', 'ndr-rest-api-to-render'); ?></button>
+                                        <button type="button" class="ndr-btn-reset ndr-js-reset"><?php echo esc_html($ui['clear']); ?></button>
                                     <?php endif; ?>
                                 </div>
                             <?php endif; ?>
@@ -503,9 +573,9 @@ class NDR_API_Frontend_Renderer
                             <div class="ndr-stats-bar">
                                 <span class="ndr-js-stats-text">
                                     <?php if ($filtered_cnt === $total_cnt) : ?>
-                                        <?php echo sprintf(wp_kses_post(__('Toplam <strong>%d</strong> kayıt listeleniyor.', 'ndr-rest-api-to-render')), $total_cnt); ?>
+                                        <?php echo sprintf($ui['stats_all'], $total_cnt); ?>
                                     <?php else : ?>
-                                        <?php echo sprintf(wp_kses_post(__('Toplam <strong>%1$d</strong> kayıt arasından <strong>%2$d</strong> sonuç gösteriliyor.', 'ndr-rest-api-to-render')), $total_cnt, $filtered_cnt); ?>
+                                        <?php echo sprintf($ui['stats_filtered'], $total_cnt, $filtered_cnt); ?>
                                     <?php endif; ?>
                                 </span>
                             </div>
@@ -543,6 +613,8 @@ class NDR_API_Frontend_Renderer
                 'customJs'        => trim(($g_settings['global_js'] ?? '') . "\n" . ($cfg['template_js'] ?? '')),
                 'enableLightbox'  => $enable_lb,
                 'globalVars'      => self::get_global_vars(),
+                'statsAllTpl'     => $ui['stats_all_js'],
+                'statsFltTpl'     => $ui['stats_flt_js'],
                 'presets'         => NDR_API_Template_Manager::get_default_presets(),
             ), JSON_UNESCAPED_UNICODE); ?>;
 
@@ -683,9 +755,9 @@ class NDR_API_Frontend_Renderer
                 var statsEl = root.querySelector('.ndr-js-stats-text');
                 if (statsEl) {
                     if (res.length === allItems.length) {
-                        statsEl.innerHTML = 'Toplam <strong>' + allItems.length + '</strong> kayıt listeleniyor.';
+                        statsEl.innerHTML = cfg.statsAllTpl.replace('{total}', allItems.length);
                     } else {
-                        statsEl.innerHTML = 'Toplam <strong>' + allItems.length + '</strong> kayıt arasından <strong>' + res.length + '</strong> sonuç gösteriliyor.';
+                        statsEl.innerHTML = cfg.statsFltTpl.replace('{total}', allItems.length).replace('{shown}', res.length);
                     }
                 }
                 var box = root.querySelector('.ndr-api-results');
