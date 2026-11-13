@@ -13,6 +13,11 @@ class NDR_API_Template_Manager
         add_filter('manage_ndr_api_template_posts_columns', array($this, 'add_template_columns'));
         add_action('manage_ndr_api_template_posts_custom_column', array($this, 'render_template_columns'), 10, 2);
         add_action('wp_ajax_ndr_api_get_template_data', array($this, 'ajax_get_template_data'));
+        add_filter('post_row_actions', array($this, 'add_template_row_actions'), 10, 2);
+        add_filter('bulk_actions-edit-ndr_api_template', array($this, 'add_bulk_export_action'));
+        add_filter('handle_bulk_actions-edit-ndr_api_template', array($this, 'handle_bulk_export_action'), 10, 3);
+        add_action('admin_init', array($this, 'handle_template_actions'));
+        add_action('admin_notices', array($this, 'render_import_bar_and_notices'));
     }
 
     public function register_template_post_type()
@@ -361,5 +366,215 @@ class NDR_API_Template_Manager
             ));
             echo esc_html(sprintf(__('%d kaynak', 'ndr-rest-api-to-render'), $q->found_posts));
         }
+    }
+
+    public function add_template_row_actions($actions, $post)
+    {
+        if ('ndr_api_template' !== $post->post_type || ! current_user_can('edit_posts')) {
+            return $actions;
+        }
+        $dup_url = wp_nonce_url(
+            add_query_arg(array('action' => 'ndr_duplicate_template', 'post' => $post->ID), admin_url('edit.php?post_type=ndr_api_template')),
+            'ndr_dup_tpl_' . $post->ID
+        );
+        $exp_url = wp_nonce_url(
+            add_query_arg(array('action' => 'ndr_export_template', 'post' => $post->ID), admin_url('edit.php?post_type=ndr_api_template')),
+            'ndr_exp_tpl_' . $post->ID
+        );
+        $actions['ndr_duplicate'] = '<a href="' . esc_url($dup_url) . '">' . esc_html__('Çoğalt', 'ndr-rest-api-to-render') . '</a>';
+        $actions['ndr_export']    = '<a href="' . esc_url($exp_url) . '">' . esc_html__('Dışa Aktar (JSON)', 'ndr-rest-api-to-render') . '</a>';
+        return $actions;
+    }
+
+    public function add_bulk_export_action($bulk_actions)
+    {
+        $bulk_actions['ndr_bulk_export_templates'] = __('Seçilenleri Dışa Aktar (JSON)', 'ndr-rest-api-to-render');
+        return $bulk_actions;
+    }
+
+    public function handle_bulk_export_action($redirect_to, $doaction, $post_ids)
+    {
+        if ($doaction !== 'ndr_bulk_export_templates' || empty($post_ids)) {
+            return $redirect_to;
+        }
+        $bundle = array(
+            'plugin'         => 'NDR-DataList',
+            'schema_version' => 1,
+            'exported_at'    => gmdate('c'),
+            'templates'      => array(),
+        );
+        foreach ($post_ids as $pid) {
+            $cfg = self::get_template_config($pid);
+            if (! empty($cfg['id'])) {
+                $bundle['templates'][] = $this->build_export_payload($cfg);
+            }
+        }
+        $filename = 'ndr-templates-bundle-' . date('Y-m-d_His') . '.json';
+        header('Content-Type: application/json; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        echo wp_json_encode($bundle, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    private function build_export_payload($cfg)
+    {
+        return array(
+            'title'             => $cfg['title'],
+            'layout_type'       => $cfg['layout_type'],
+            'grid_min_width'    => $cfg['grid_min_width'],
+            'grid_max_width'    => $cfg['grid_max_width'],
+            'enable_lightbox'   => ! empty($cfg['enable_lightbox']) ? 1 : 0,
+            'table_headers'     => $cfg['table_headers'],
+            'template_html'     => $cfg['template_html'],
+            'template_css'      => $cfg['template_css'],
+            'template_js'       => $cfg['template_js'],
+            'controls_position' => $cfg['controls_position'],
+            'controls_html_top' => $cfg['controls_html_top'],
+            'controls_html_bot' => $cfg['controls_html_bot'],
+            'controls_css'      => $cfg['controls_css'],
+            'empty_message'     => $cfg['empty_message'],
+        );
+    }
+
+    public static function create_template_from_payload($data, $title_override = '')
+    {
+        $title = $title_override !== '' ? $title_override : sanitize_text_field($data['title'] ?? 'İçe Aktarılan Şablon');
+        $new_id = wp_insert_post(array(
+            'post_type'   => 'ndr_api_template',
+            'post_title'  => $title,
+            'post_status' => 'publish',
+        ));
+        if (is_wp_error($new_id) || ! $new_id) {
+            return $new_id;
+        }
+        $meta_map = array(
+            'layout_type'       => '_ndr_tpl_layout_type',
+            'grid_min_width'    => '_ndr_tpl_grid_min_width',
+            'grid_max_width'    => '_ndr_tpl_grid_max_width',
+            'enable_lightbox'   => '_ndr_tpl_enable_lightbox',
+            'table_headers'     => '_ndr_tpl_table_headers',
+            'template_html'     => '_ndr_tpl_html',
+            'template_css'      => '_ndr_tpl_css',
+            'template_js'       => '_ndr_tpl_js',
+            'controls_position' => '_ndr_tpl_controls_position',
+            'controls_html_top' => '_ndr_tpl_controls_html_top',
+            'controls_html_bot' => '_ndr_tpl_controls_html_bot',
+            'controls_css'      => '_ndr_tpl_controls_css',
+            'empty_message'     => '_ndr_tpl_empty_message',
+        );
+        foreach ($meta_map as $key => $meta_key) {
+            if (array_key_exists($key, $data)) {
+                update_post_meta($new_id, $meta_key, $data[$key]);
+            }
+        }
+        return $new_id;
+    }
+
+    public function handle_template_actions()
+    {
+        if (! is_admin() || ! current_user_can('edit_posts')) {
+            return;
+        }
+
+        // Duplicate template
+        if (isset($_GET['action'], $_GET['post']) && $_GET['action'] === 'ndr_duplicate_template') {
+            $post_id = absint($_GET['post']);
+            check_admin_referer('ndr_dup_tpl_' . $post_id);
+            $cfg = self::get_template_config($post_id);
+            if (! empty($cfg['id'])) {
+                $payload = $this->build_export_payload($cfg);
+                $new_id  = self::create_template_from_payload($payload, $cfg['title'] . ' (Kopya)');
+                wp_safe_redirect(add_query_arg(array('post_type' => 'ndr_api_template', 'ndr_tpl_msg' => 'duplicated', 'new_id' => $new_id), admin_url('edit.php')));
+                exit;
+            }
+        }
+
+        // Export single template
+        if (isset($_GET['action'], $_GET['post']) && $_GET['action'] === 'ndr_export_template') {
+            $post_id = absint($_GET['post']);
+            check_admin_referer('ndr_exp_tpl_' . $post_id);
+            $cfg = self::get_template_config($post_id);
+            if (! empty($cfg['id'])) {
+                $bundle = array(
+                    'plugin'         => 'NDR-DataList',
+                    'schema_version' => 1,
+                    'exported_at'    => gmdate('c'),
+                    'templates'      => array($this->build_export_payload($cfg)),
+                );
+                $slug = sanitize_title($cfg['title'] ?: 'sablon-' . $post_id);
+                $filename = 'ndr-template-' . $slug . '-' . date('Y-m-d') . '.json';
+                header('Content-Type: application/json; charset=utf-8');
+                header('Content-Disposition: attachment; filename="' . $filename . '"');
+                echo wp_json_encode($bundle, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
+
+        // Import templates from JSON file
+        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ndr_tpl_import_nonce'])) {
+            check_admin_referer('ndr_tpl_import_action', 'ndr_tpl_import_nonce');
+            if (empty($_FILES['ndr_tpl_import_file']['tmp_name'])) {
+                wp_safe_redirect(add_query_arg(array('post_type' => 'ndr_api_template', 'ndr_tpl_err' => 'no_file'), admin_url('edit.php')));
+                exit;
+            }
+            $raw = file_get_contents($_FILES['ndr_tpl_import_file']['tmp_name']);
+            $json = json_decode((string) $raw, true);
+            if (json_last_error() !== JSON_ERROR_NONE || ! is_array($json)) {
+                wp_safe_redirect(add_query_arg(array('post_type' => 'ndr_api_template', 'ndr_tpl_err' => 'bad_json'), admin_url('edit.php')));
+                exit;
+            }
+
+            $list = array();
+            if (! empty($json['templates']) && is_array($json['templates'])) {
+                $list = $json['templates'];
+            } elseif (isset($json['layout_type']) || isset($json['template_html'])) {
+                $list = array($json);
+            }
+
+            $imported = 0;
+            foreach ($list as $tpl_data) {
+                if (is_array($tpl_data)) {
+                    $res = self::create_template_from_payload($tpl_data);
+                    if (! is_wp_error($res) && $res) {
+                        $imported++;
+                    }
+                }
+            }
+            wp_safe_redirect(add_query_arg(array('post_type' => 'ndr_api_template', 'ndr_tpl_msg' => 'imported', 'imp_cnt' => $imported), admin_url('edit.php')));
+            exit;
+        }
+    }
+
+    public function render_import_bar_and_notices()
+    {
+        global $typenow, $pagenow;
+        if ('edit.php' !== $pagenow || 'ndr_api_template' !== $typenow) {
+            return;
+        }
+
+        $msg = sanitize_text_field(wp_unslash($_GET['ndr_tpl_msg'] ?? ''));
+        $err = sanitize_text_field(wp_unslash($_GET['ndr_tpl_err'] ?? ''));
+        if ($msg === 'duplicated') {
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Şablon başarıyla çoğaltıldı.', 'ndr-rest-api-to-render') . '</p></div>';
+        } elseif ($msg === 'imported') {
+            $cnt = absint($_GET['imp_cnt'] ?? 0);
+            echo '<div class="notice notice-success is-dismissible"><p>' . esc_html(sprintf(__('%d adet şablon başarıyla içe aktarıldı.', 'ndr-rest-api-to-render'), $cnt)) . '</p></div>';
+        }
+        if ($err === 'no_file') {
+            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Lütfen bir JSON dosyası seçin.', 'ndr-rest-api-to-render') . '</p></div>';
+        } elseif ($err === 'bad_json') {
+            echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__('Geçersiz şablon JSON dosyası.', 'ndr-rest-api-to-render') . '</p></div>';
+        }
+        ?>
+        <div style="background:#fff;border:1px solid #dcdcde;border-left:4px solid #2271b1;border-radius:4px;padding:10px 14px;margin:12px 18px 8px 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <form method="post" enctype="multipart/form-data" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <?php wp_nonce_field('ndr_tpl_import_action', 'ndr_tpl_import_nonce'); ?>
+                <strong><?php esc_html_e('Şablon İçe Aktar (JSON):', 'ndr-rest-api-to-render'); ?></strong>
+                <input type="file" name="ndr_tpl_import_file" accept=".json,application/json" required />
+                <button type="submit" class="button button-primary button-small"><?php esc_html_e('İçe Aktar', 'ndr-rest-api-to-render'); ?></button>
+            </form>
+            <span class="description"><?php esc_html_e('Tekli veya toplu dışa aktarılmış .json şablon dosyalarını yükleyebilirsiniz.', 'ndr-rest-api-to-render'); ?></span>
+        </div>
+        <?php
     }
 }

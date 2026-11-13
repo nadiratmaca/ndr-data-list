@@ -3,7 +3,7 @@
 /**
  * Plugin Name: NDR-DataList
  * Description: Multiple API data sources with templates, CSS, JS and shortcodes.
- * Version: 1.2.2
+ * Version: 1.3.0
  * Author: Nadir Atmaca
  * Text Domain: ndr-rest-api-to-render
  */
