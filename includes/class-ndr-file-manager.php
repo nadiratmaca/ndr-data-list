@@ -10,6 +10,7 @@ class NDR_API_File_Manager
         add_action('admin_menu', array($this, 'register_menu'), 24);
         add_action('admin_init', array($this, 'handle_actions'));
         add_action('wp_ajax_ndr_fm_upload', array($this, 'ajax_upload'));
+        add_action('wp_ajax_ndr_fm_check_conflicts', array($this, 'ajax_check_conflicts'));
     }
 
     public function register_menu()
@@ -115,14 +116,35 @@ class NDR_API_File_Manager
         exit;
     }
 
+    public function ajax_check_conflicts()
+    {
+        check_ajax_referer('ndr_fm_action', 'ndr_fm_nonce');
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Yetkiniz yok.'), 403);
+        }
+        $sub   = sanitize_text_field(wp_unslash($_POST['current_dir'] ?? ''));
+        $dir   = $this->resolve_safe_path($sub);
+        $names = isset($_POST['file_names']) ? (array) wp_unslash($_POST['file_names']) : array();
+
+        $conflicts = array();
+        foreach ($names as $raw) {
+            $fname = sanitize_file_name($raw);
+            if ($fname !== '' && file_exists($dir . '/' . $fname)) {
+                $conflicts[] = $fname;
+            }
+        }
+        wp_send_json_success(array('conflicts' => $conflicts));
+    }
+
     public function ajax_upload()
     {
         check_ajax_referer('ndr_fm_action', 'ndr_fm_nonce');
         if (! current_user_can('manage_options')) {
             wp_send_json_error(array('message' => 'Yetkiniz yok.'), 403);
         }
-        $sub = sanitize_text_field(wp_unslash($_POST['current_dir'] ?? ''));
-        $dir = $this->resolve_safe_path($sub);
+        $sub           = sanitize_text_field(wp_unslash($_POST['current_dir'] ?? ''));
+        $dir           = $this->resolve_safe_path($sub);
+        $conflict_mode = sanitize_text_field(wp_unslash($_POST['conflict_mode'] ?? 'overwrite'));
 
         if (empty($_FILES['fm_files']['name'][0])) {
             wp_send_json_error(array('message' => 'Yüklenecek dosya seçilmedi.'));
@@ -138,7 +160,21 @@ class NDR_API_File_Manager
             if ($fname === '') {
                 continue;
             }
-            if (move_uploaded_file($_FILES['fm_files']['tmp_name'][$i], $dir . '/' . $fname)) {
+            $dest = $dir . '/' . $fname;
+            if (file_exists($dest)) {
+                if ($conflict_mode === 'skip') {
+                    continue;
+                } elseif ($conflict_mode === 'rename') {
+                    $pi  = pathinfo($fname);
+                    $ext = isset($pi['extension']) && $pi['extension'] !== '' ? '.' . $pi['extension'] : '';
+                    $n   = 1;
+                    while (file_exists($dir . '/' . $pi['filename'] . '_' . $n . $ext)) {
+                        $n++;
+                    }
+                    $dest = $dir . '/' . $pi['filename'] . '_' . $n . $ext;
+                }
+            }
+            if (move_uploaded_file($_FILES['fm_files']['tmp_name'][$i], $dest)) {
                 $ok++;
             }
         }
@@ -146,7 +182,7 @@ class NDR_API_File_Manager
         if ($ok > 0) {
             wp_send_json_success(array('uploaded' => $ok));
         }
-        wp_send_json_error(array('message' => 'Dosya(lar) yüklenemedi.'));
+        wp_send_json_error(array('message' => 'Dosya(lar) yüklenemedi veya atlandı.'));
     }
 
     public function handle_actions()
@@ -860,6 +896,20 @@ class NDR_API_File_Manager
             <!-- Right-click Context Menu -->
             <div class="ndr-fm-ctx-menu" id="ndr-fm-ctx-menu"></div>
 
+            <!-- Upload Conflict Modal -->
+            <div class="ndr-fm-modal-bg" id="ndr-fm-conflict-modal">
+                <div class="ndr-fm-modal-box" style="max-width:460px;">
+                    <h3 style="margin-top:0;color:#b32d2e;">&#9888; Dosya Çakışması Tespit Edildi</h3>
+                    <p style="margin-bottom:8px;">Aşağıdaki dosya(lar) bu klasörde zaten mevcut. Nasıl devam etmek istersiniz?</p>
+                    <ul id="ndr-fm-conflict-list" style="background:#f6f7f7;border:1px solid #dcdcde;border-radius:4px;padding:8px 12px 8px 26px;max-height:140px;overflow:auto;font-family:monospace;font-size:12.5px;"></ul>
+                    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
+                        <button type="button" class="button" id="ndr-fm-conf-cancel">İptal</button>
+                        <button type="button" class="button button-secondary" id="ndr-fm-conf-rename">Ad Değiştir (Yeni İsimle Yükle)</button>
+                        <button type="button" class="button button-primary" id="ndr-fm-conf-overwrite">Üzerine Yaz</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Image Preview Modal -->
             <div class="ndr-fm-modal-bg" id="ndr-fm-img-modal">
                 <div class="ndr-fm-modal-box" style="text-align:center;">
@@ -931,13 +981,12 @@ class NDR_API_File_Manager
                     $('#ndr-fm-progress-fill').css('width', '65%');
                 });
 
-                // AJAX Upload with Real Progress Bar
-                $('#ndr-fm-upload-form').on('submit', function(e){
-                    e.preventDefault();
+                // AJAX Upload with Conflict Check + Real Progress Bar
+                function executeUpload(formEl, conflictMode) {
                     var files = $('#ndr-fm-upload-input')[0].files;
-                    if (!files.length) { alert('Lütfen dosya seçin.'); return; }
-                    var fd = new FormData(this);
+                    var fd = new FormData(formEl);
                     fd.append('action', 'ndr_fm_upload');
+                    fd.append('conflict_mode', conflictMode || 'overwrite');
                     $('#ndr-fm-progress-wrap').show();
                     $('#ndr-fm-progress-label').text('Dosyalar yükleniyor (' + files.length + ' dosya)...');
                     $('#ndr-fm-progress-pct').text('0%');
@@ -964,6 +1013,52 @@ class NDR_API_File_Manager
                         } catch (err) { alert('Sunucu yanıtı okunamadı.'); }
                     };
                     xhr.send(fd);
+                }
+
+                var pendingUploadForm = null;
+                $('#ndr-fm-upload-form').on('submit', function(e){
+                    e.preventDefault();
+                    var formEl = this;
+                    var files = $('#ndr-fm-upload-input')[0].files;
+                    if (!files.length) { alert('Lütfen dosya seçin.'); return; }
+
+                    var names = [];
+                    for (var i = 0; i < files.length; i++) {
+                        names.push(files[i].name);
+                    }
+
+                    $.post(ajaxurl, {
+                        action: 'ndr_fm_check_conflicts',
+                        ndr_fm_nonce: $(formEl).find('input[name="ndr_fm_nonce"]').val(),
+                        current_dir: $(formEl).find('input[name="current_dir"]').val(),
+                        file_names: names
+                    }).done(function(res){
+                        if (res && res.success && res.data && res.data.conflicts && res.data.conflicts.length) {
+                            pendingUploadForm = formEl;
+                            var listHtml = res.data.conflicts.map(function(n){
+                                return '<li>' + $('<div/>').text(n).html() + '</li>';
+                            }).join('');
+                            $('#ndr-fm-conflict-list').html(listHtml);
+                            $('#ndr-fm-conflict-modal').addClass('is-open');
+                        } else {
+                            executeUpload(formEl, 'overwrite');
+                        }
+                    }).fail(function(){
+                        executeUpload(formEl, 'overwrite');
+                    });
+                });
+
+                $('#ndr-fm-conf-cancel').on('click', function(){
+                    $('#ndr-fm-conflict-modal').removeClass('is-open');
+                    pendingUploadForm = null;
+                });
+                $('#ndr-fm-conf-rename').on('click', function(){
+                    $('#ndr-fm-conflict-modal').removeClass('is-open');
+                    if (pendingUploadForm) executeUpload(pendingUploadForm, 'rename');
+                });
+                $('#ndr-fm-conf-overwrite').on('click', function(){
+                    $('#ndr-fm-conflict-modal').removeClass('is-open');
+                    if (pendingUploadForm) executeUpload(pendingUploadForm, 'overwrite');
                 });
 
                 // Single Actions
