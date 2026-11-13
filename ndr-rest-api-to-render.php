@@ -3,7 +3,7 @@
 /**
  * Plugin Name: NDR-DataList
  * Description: Multiple API data sources with templates, CSS, JS and shortcodes.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Nadir Atmaca
  * Text Domain: ndr-rest-api-to-render
  */
@@ -108,7 +108,7 @@ if (! class_exists('NDR_REST_API_To_Render')) {
         {
             global $typenow;
 
-            $is_settings_page = (isset($_GET['page']) && 'ndr-data-settings' === $_GET['page']);
+            $is_settings_page = (isset($_GET['page']) && in_array($_GET['page'], array('ndr-data-settings', 'ndr-file-manager'), true));
             if (! $is_settings_page) {
                 if (! in_array($typenow, array('ndr_api_source', 'ndr_api_template'), true)) {
                     return;

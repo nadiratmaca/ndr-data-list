@@ -9,6 +9,7 @@ class NDR_API_File_Manager
     {
         add_action('admin_menu', array($this, 'register_menu'), 24);
         add_action('admin_init', array($this, 'handle_actions'));
+        add_action('wp_ajax_ndr_fm_upload', array($this, 'ajax_upload'));
     }
 
     public function register_menu()
@@ -30,8 +31,6 @@ class NDR_API_File_Manager
         if ($rel === '') {
             $rel = 'wp-content/uploads/ndr-files';
         }
-
-        // Allow absolute path if inside ABSPATH, otherwise treat as relative to ABSPATH
         $abs = (strpos($rel, '/') === 0) ? $rel : trailingslashit(ABSPATH) . ltrim($rel, '/');
         if (! file_exists($abs)) {
             wp_mkdir_p($abs);
@@ -77,12 +76,32 @@ class NDR_API_File_Manager
         return '';
     }
 
-    private function redirect_back($subpath, $msg = '', $err = '')
+    private function list_all_dirs()
     {
-        $args = array(
+        $root = self::get_root_dir();
+        $dirs = array('' => '/ (Kök Dizin)');
+        $it = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($root, RecursiveDirectoryIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::SELF_FIRST
+        );
+        foreach ($it as $item) {
+            if ($item->isDir()) {
+                $rel = $this->get_rel_path($item->getPathname());
+                if ($rel !== '') {
+                    $dirs[$rel] = '/' . $rel;
+                }
+            }
+        }
+        natcasesort($dirs);
+        return $dirs;
+    }
+
+    private function redirect_back($subpath, $msg = '', $err = '', $extra = array())
+    {
+        $args = array_merge(array(
             'post_type' => 'ndr_api_source',
             'page'      => 'ndr-file-manager',
-        );
+        ), $extra);
         if ($subpath !== '') {
             $args['dir'] = $subpath;
         }
@@ -94,6 +113,40 @@ class NDR_API_File_Manager
         }
         wp_safe_redirect(add_query_arg($args, admin_url('edit.php')));
         exit;
+    }
+
+    public function ajax_upload()
+    {
+        check_ajax_referer('ndr_fm_action', 'ndr_fm_nonce');
+        if (! current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Yetkiniz yok.'), 403);
+        }
+        $sub = sanitize_text_field(wp_unslash($_POST['current_dir'] ?? ''));
+        $dir = $this->resolve_safe_path($sub);
+
+        if (empty($_FILES['fm_files']['name'][0])) {
+            wp_send_json_error(array('message' => 'Yüklenecek dosya seçilmedi.'));
+        }
+
+        $count = count($_FILES['fm_files']['name']);
+        $ok = 0;
+        for ($i = 0; $i < $count; $i++) {
+            if ($_FILES['fm_files']['error'][$i] !== UPLOAD_ERR_OK) {
+                continue;
+            }
+            $fname = sanitize_file_name($_FILES['fm_files']['name'][$i]);
+            if ($fname === '') {
+                continue;
+            }
+            if (move_uploaded_file($_FILES['fm_files']['tmp_name'][$i], $dir . '/' . $fname)) {
+                $ok++;
+            }
+        }
+
+        if ($ok > 0) {
+            wp_send_json_success(array('uploaded' => $ok));
+        }
+        wp_send_json_error(array('message' => 'Dosya(lar) yüklenemedi.'));
     }
 
     public function handle_actions()
@@ -108,9 +161,9 @@ class NDR_API_File_Manager
         // Download single file
         if (isset($_GET['fm_download'], $_GET['_wpnonce']) && wp_verify_nonce(wp_unslash($_GET['_wpnonce']), 'ndr_fm_download')) {
             $sub  = sanitize_text_field(wp_unslash($_GET['dir'] ?? ''));
-            $dir  = $this->resolve_safe_path($sub);
-            $name = basename(sanitize_text_field(wp_unslash($_GET['fm_download'])));
-            $file = $this->resolve_safe_path(($sub ? $sub . '/' : '') . $name);
+            $raw  = sanitize_text_field(wp_unslash($_GET['fm_download']));
+            $rel  = ($sub !== '' && strpos($raw, '/') === false) ? $sub . '/' . $raw : $raw;
+            $file = $this->resolve_safe_path($rel);
             if (is_file($file)) {
                 header('Content-Description: File Transfer');
                 header('Content-Type: application/octet-stream');
@@ -128,32 +181,25 @@ class NDR_API_File_Manager
             wp_die(esc_html__('Güvenlik doğrulaması başarısız.', 'ndr-rest-api-to-render'));
         }
 
-        $sub = sanitize_text_field(wp_unslash($_POST['current_dir'] ?? ''));
-        $dir = $this->resolve_safe_path($sub);
+        $sub     = sanitize_text_field(wp_unslash($_POST['current_dir'] ?? ''));
+        $dir     = $this->resolve_safe_path($sub);
         $rel_dir = $this->get_rel_path($dir);
-        $action = sanitize_text_field(wp_unslash($_POST['fm_action'] ?? ''));
+        $action  = sanitize_text_field(wp_unslash($_POST['fm_action'] ?? ''));
 
-        // 1. Upload multiple files
+        // Fallback non-AJAX upload
         if ($action === 'upload' && ! empty($_FILES['fm_files']['name'][0])) {
             $count = count($_FILES['fm_files']['name']);
             $ok = 0;
             for ($i = 0; $i < $count; $i++) {
-                if ($_FILES['fm_files']['error'][$i] !== UPLOAD_ERR_OK) {
-                    continue;
-                }
+                if ($_FILES['fm_files']['error'][$i] !== UPLOAD_ERR_OK) continue;
                 $fname = sanitize_file_name($_FILES['fm_files']['name'][$i]);
-                if ($fname === '') {
-                    continue;
-                }
-                $dest = $dir . '/' . $fname;
-                if (move_uploaded_file($_FILES['fm_files']['tmp_name'][$i], $dest)) {
+                if ($fname && move_uploaded_file($_FILES['fm_files']['tmp_name'][$i], $dir . '/' . $fname)) {
                     $ok++;
                 }
             }
             $this->redirect_back($rel_dir, $ok > 0 ? 'uploaded' : '', $ok === 0 ? 'Dosya yüklenemedi.' : '');
         }
 
-        // 2. Create Folder
         if ($action === 'mkdir') {
             $folder = sanitize_file_name(wp_unslash($_POST['folder_name'] ?? ''));
             if ($folder === '') {
@@ -165,23 +211,22 @@ class NDR_API_File_Manager
             $this->redirect_back($rel_dir, '', 'Klasör oluşturulamadı.');
         }
 
-        // 3. Rename
         if ($action === 'rename') {
-            $old_name = basename(sanitize_text_field(wp_unslash($_POST['old_name'] ?? '')));
+            $old_rel  = sanitize_text_field(wp_unslash($_POST['old_name'] ?? ''));
             $new_name = sanitize_file_name(wp_unslash($_POST['new_name'] ?? ''));
-            $old_path = $this->resolve_safe_path(($rel_dir ? $rel_dir . '/' : '') . $old_name);
-            if ($old_name && $new_name && file_exists($old_path) && $old_path !== self::get_root_dir()) {
-                rename($old_path, $dir . '/' . $new_name);
+            $old_path = $this->resolve_safe_path(($rel_dir && strpos($old_rel, '/') === false ? $rel_dir . '/' : '') . $old_rel);
+            if ($old_rel && $new_name && file_exists($old_path) && $old_path !== self::get_root_dir()) {
+                $parent = dirname($old_path);
+                rename($old_path, $parent . '/' . $new_name);
                 $this->redirect_back($rel_dir, 'renamed');
             }
             $this->redirect_back($rel_dir, '', 'Yeniden adlandırma başarısız.');
         }
 
-        // 4. Save Edited File Content
         if ($action === 'save_file') {
-            $fname   = basename(sanitize_text_field(wp_unslash($_POST['file_name'] ?? '')));
+            $frel    = sanitize_text_field(wp_unslash($_POST['file_name'] ?? ''));
             $content = wp_unslash($_POST['file_content'] ?? '');
-            $fpath   = $this->resolve_safe_path(($rel_dir ? $rel_dir . '/' : '') . $fname);
+            $fpath   = $this->resolve_safe_path(($rel_dir && strpos($frel, '/') === false ? $rel_dir . '/' : '') . $frel);
             if (is_file($fpath) && is_writable($fpath)) {
                 file_put_contents($fpath, $content);
                 $this->redirect_back($rel_dir, 'saved');
@@ -189,10 +234,9 @@ class NDR_API_File_Manager
             $this->redirect_back($rel_dir, '', 'Dosya kaydedilemedi.');
         }
 
-        // 5. Single Delete
         if ($action === 'delete_one') {
-            $fname = basename(sanitize_text_field(wp_unslash($_POST['target_name'] ?? '')));
-            $fpath = $this->resolve_safe_path(($rel_dir ? $rel_dir . '/' : '') . $fname);
+            $trel  = sanitize_text_field(wp_unslash($_POST['target_name'] ?? ''));
+            $fpath = $this->resolve_safe_path(($rel_dir && strpos($trel, '/') === false ? $rel_dir . '/' : '') . $trel);
             if ($fpath !== self::get_root_dir() && file_exists($fpath)) {
                 $this->delete_recursive($fpath);
                 $this->redirect_back($rel_dir, 'deleted');
@@ -200,24 +244,50 @@ class NDR_API_File_Manager
             $this->redirect_back($rel_dir, '', 'Silme işlemi başarısız.');
         }
 
-        // 6. Unzip
+        if ($action === 'copy_one' || $action === 'move_one') {
+            $trel      = sanitize_text_field(wp_unslash($_POST['target_name'] ?? ''));
+            $target_sub = sanitize_text_field(wp_unslash($_POST['target_dir'] ?? ''));
+            $src_path  = $this->resolve_safe_path(($rel_dir && strpos($trel, '/') === false ? $rel_dir . '/' : '') . $trel);
+            $dest_dir  = $this->resolve_safe_path($target_sub);
+
+            if ($src_path === self::get_root_dir() || ! file_exists($src_path) || ! is_dir($dest_dir)) {
+                $this->redirect_back($rel_dir, '', 'Geçersiz kaynak veya hedef dizin.');
+            }
+            $dest_path = $dest_dir . '/' . basename($src_path);
+            if ($action === 'copy_one') {
+                if ($src_path === $dest_path) {
+                    $pi = pathinfo(basename($src_path));
+                    $dest_path = $dest_dir . '/' . $pi['filename'] . '_kopya' . (isset($pi['extension']) ? '.' . $pi['extension'] : '');
+                }
+                $this->copy_recursive($src_path, $dest_path);
+                $this->redirect_back($rel_dir, 'copied');
+            } else {
+                if ($src_path !== $dest_path && strpos($dest_path, $src_path . '/') !== 0) {
+                    rename($src_path, $dest_path);
+                    $this->redirect_back($rel_dir, 'moved');
+                }
+                $this->redirect_back($rel_dir, '', 'Aynı dizine veya alt dizinine taşınamaz.');
+            }
+        }
+
         if ($action === 'unzip') {
             if (! class_exists('ZipArchive')) {
                 $this->redirect_back($rel_dir, '', 'Sunucuda PHP ZipArchive desteği yok.');
             }
-            $fname = basename(sanitize_text_field(wp_unslash($_POST['target_name'] ?? '')));
-            $fpath = $this->resolve_safe_path(($rel_dir ? $rel_dir . '/' : '') . $fname);
+            $trel  = sanitize_text_field(wp_unslash($_POST['target_name'] ?? ''));
+            $fpath = $this->resolve_safe_path(($rel_dir && strpos($trel, '/') === false ? $rel_dir . '/' : '') . $trel);
             if (! is_file($fpath) || strtolower(pathinfo($fpath, PATHINFO_EXTENSION)) !== 'zip') {
                 $this->redirect_back($rel_dir, '', 'Geçerli bir ZIP dosyası bulunamadı.');
             }
+            $extract_dir = dirname($fpath);
             $zip = new ZipArchive();
             if ($zip->open($fpath) === true) {
                 for ($i = 0; $i < $zip->numFiles; $i++) {
                     $entry = $zip->getNameIndex($i);
                     if (strpos($entry, '..') !== false || strpos($entry, '/') === 0) {
-                        continue; // Zip-Slip protection
+                        continue;
                     }
-                    $dest = $dir . '/' . $entry;
+                    $dest = $extract_dir . '/' . $entry;
                     if (substr($entry, -1) === '/') {
                         wp_mkdir_p($dest);
                     } else {
@@ -231,22 +301,44 @@ class NDR_API_File_Manager
             $this->redirect_back($rel_dir, '', 'ZIP arşivi açılamadı.');
         }
 
-        // 7. Bulk Actions (bulk_delete / bulk_zip)
         if ($action === 'bulk') {
-            $bulk_op = sanitize_text_field(wp_unslash($_POST['bulk_op'] ?? ''));
-            $items   = isset($_POST['selected_items']) ? array_map('sanitize_text_field', (array) wp_unslash($_POST['selected_items'])) : array();
+            $bulk_op    = sanitize_text_field(wp_unslash($_POST['bulk_op'] ?? ''));
+            $target_sub = sanitize_text_field(wp_unslash($_POST['bulk_target_dir'] ?? ''));
+            $items      = isset($_POST['selected_items']) ? array_map('sanitize_text_field', (array) wp_unslash($_POST['selected_items'])) : array();
             if (empty($items)) {
                 $this->redirect_back($rel_dir, '', 'Hiçbir öğe seçilmedi.');
             }
 
+            $cnt = 0;
             if ($bulk_op === 'delete') {
                 foreach ($items as $it) {
-                    $p = $this->resolve_safe_path(($rel_dir ? $rel_dir . '/' : '') . basename($it));
-                    if ($p !== self::get_root_dir() && file_exists($p)) {
-                        $this->delete_recursive($p);
+                    $p = $this->resolve_safe_path(($rel_dir && strpos($it, '/') === false ? $rel_dir . '/' : '') . $it);
+                    if ($p !== self::get_root_dir() && file_exists($p) && $this->delete_recursive($p)) {
+                        $cnt++;
                     }
                 }
-                $this->redirect_back($rel_dir, 'bulk_deleted');
+                $this->redirect_back($rel_dir, 'bulk_deleted', '', array('fm_cnt' => $cnt));
+            }
+
+            if ($bulk_op === 'copy' || $bulk_op === 'move') {
+                $dest_dir = $this->resolve_safe_path($target_sub);
+                foreach ($items as $it) {
+                    $src = $this->resolve_safe_path(($rel_dir && strpos($it, '/') === false ? $rel_dir . '/' : '') . $it);
+                    if ($src === self::get_root_dir() || ! file_exists($src)) continue;
+                    $dest = $dest_dir . '/' . basename($src);
+                    if ($bulk_op === 'copy') {
+                        if ($src === $dest) {
+                            $pi = pathinfo(basename($src));
+                            $dest = $dest_dir . '/' . $pi['filename'] . '_kopya' . (isset($pi['extension']) ? '.' . $pi['extension'] : '');
+                        }
+                        if ($this->copy_recursive($src, $dest)) $cnt++;
+                    } else {
+                        if ($src !== $dest && strpos($dest, $src . '/') !== 0 && @rename($src, $dest)) {
+                            $cnt++;
+                        }
+                    }
+                }
+                $this->redirect_back($rel_dir, $bulk_op === 'copy' ? 'bulk_copied' : 'bulk_moved', '', array('fm_cnt' => $cnt));
             }
 
             if ($bulk_op === 'zip') {
@@ -258,20 +350,38 @@ class NDR_API_File_Manager
                 $zip = new ZipArchive();
                 if ($zip->open($zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true) {
                     foreach ($items as $it) {
-                        $name = basename($it);
-                        $p = $this->resolve_safe_path(($rel_dir ? $rel_dir . '/' : '') . $name);
+                        $p = $this->resolve_safe_path(($rel_dir && strpos($it, '/') === false ? $rel_dir . '/' : '') . $it);
+                        $name = basename($p);
                         if (is_file($p)) {
                             $zip->addFile($p, $name);
+                            $cnt++;
                         } elseif (is_dir($p)) {
                             $this->add_dir_to_zip($zip, $p, $name);
+                            $cnt++;
                         }
                     }
                     $zip->close();
-                    $this->redirect_back($rel_dir, 'zipped');
+                    $this->redirect_back($rel_dir, 'zipped', '', array('fm_cnt' => $cnt));
                 }
                 $this->redirect_back($rel_dir, '', 'ZIP paketi oluşturulamadı.');
             }
         }
+    }
+
+    private function copy_recursive($src, $dst)
+    {
+        if (is_file($src)) {
+            return @copy($src, $dst);
+        }
+        if (is_dir($src)) {
+            wp_mkdir_p($dst);
+            foreach (scandir($src) as $f) {
+                if ($f === '.' || $f === '..') continue;
+                $this->copy_recursive($src . '/' . $f, $dst . '/' . $f);
+            }
+            return true;
+        }
+        return false;
     }
 
     private function add_dir_to_zip($zip, $dir, $base)
@@ -303,6 +413,37 @@ class NDR_API_File_Manager
         return false;
     }
 
+    private function get_file_type_info($path, $is_dir)
+    {
+        if ($is_dir) {
+            return array('label' => 'Klasör', 'icon' => 'dashicons-category', 'color' => '#d97706', 'is_img' => false, 'is_edit' => false, 'mode' => '');
+        }
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $img_exts = array('jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif');
+        $code_modes = array(
+            'json' => 'application/json',
+            'js'   => 'application/javascript',
+            'css'  => 'text/css',
+            'html' => 'htmlmixed',
+            'htm'  => 'htmlmixed',
+            'xml'  => 'application/xml',
+            'svg'  => 'application/xml',
+            'csv'  => 'text/plain',
+            'txt'  => 'text/plain',
+            'md'   => 'text/plain',
+        );
+        if (in_array($ext, $img_exts, true)) {
+            return array('label' => 'Görsel (' . strtoupper($ext) . ')', 'icon' => 'dashicons-format-image', 'color' => '#059669', 'is_img' => true, 'is_edit' => ($ext === 'svg'), 'mode' => $code_modes[$ext] ?? '');
+        }
+        if ($ext === 'zip') {
+            return array('label' => 'ZIP Arşiv', 'icon' => 'dashicons-media-archive', 'color' => '#7c3aed', 'is_img' => false, 'is_edit' => false, 'mode' => '');
+        }
+        if (isset($code_modes[$ext])) {
+            return array('label' => strtoupper($ext) . ' Dosyası', 'icon' => 'dashicons-media-code', 'color' => '#2563eb', 'is_img' => false, 'is_edit' => true, 'mode' => $code_modes[$ext]);
+        }
+        return array('label' => $ext ? strtoupper($ext) : 'Dosya', 'icon' => 'dashicons-media-default', 'color' => '#64748b', 'is_img' => false, 'is_edit' => false, 'mode' => '');
+    }
+
     public function render_page()
     {
         $root    = self::get_root_dir();
@@ -310,47 +451,162 @@ class NDR_API_File_Manager
         $cur_dir = $this->resolve_safe_path($sub);
         $rel_dir = $this->get_rel_path($cur_dir);
 
-        // Edit file mode?
-        $edit_file = isset($_GET['edit']) ? basename(sanitize_text_field(wp_unslash($_GET['edit']))) : '';
-        $edit_path = $edit_file ? $this->resolve_safe_path(($rel_dir ? $rel_dir . '/' : '') . $edit_file) : '';
-        $is_editing = ($edit_file && is_file($edit_path));
+        $search_q = trim(sanitize_text_field(wp_unslash($_GET['fm_q'] ?? '')));
+        $sort_by  = sanitize_text_field(wp_unslash($_GET['sort'] ?? 'name'));
+        $order    = strtolower(sanitize_text_field(wp_unslash($_GET['order'] ?? 'asc'))) === 'desc' ? 'desc' : 'asc';
+        $per_page = absint($_GET['per_page'] ?? 50);
+        if (! in_array($per_page, array(50, 100, 200), true)) {
+            $per_page = 50;
+        }
+        $paged = max(1, absint($_GET['paged'] ?? 1));
 
+        // Edit file mode
+        $edit_file  = isset($_GET['edit']) ? sanitize_text_field(wp_unslash($_GET['edit'])) : '';
+        $edit_path  = $edit_file ? $this->resolve_safe_path(($rel_dir && strpos($edit_file, '/') === false ? $rel_dir . '/' : '') . $edit_file) : '';
+        $is_editing = ($edit_file && is_file($edit_path));
+        $edit_info  = $is_editing ? $this->get_file_type_info($edit_path, false) : null;
+
+        $fm_cnt = absint($_GET['fm_cnt'] ?? 0);
         $msg_map = array(
             'uploaded'     => 'Dosya(lar) başarıyla yüklendi.',
             'mkdir_ok'     => 'Klasör oluşturuldu.',
             'renamed'      => 'Öğe yeniden adlandırıldı.',
             'saved'        => 'Dosya içeriği kaydedildi.',
             'deleted'      => 'Öğe silindi.',
-            'bulk_deleted' => 'Seçilen öğeler silindi.',
-            'zipped'       => 'ZIP paketi oluşturuldu.',
-            'unzipped'     => 'ZIP arşivi mevcut klasöre açıldı.',
+            'copied'       => 'Öğe hedef klasöre kopyalandı.',
+            'moved'        => 'Öğe hedef klasöre taşındı.',
+            'bulk_deleted' => "{$fm_cnt} öğe toplu olarak silindi.",
+            'bulk_copied'  => "{$fm_cnt} öğe hedef klasöre kopyalandı.",
+            'bulk_moved'   => "{$fm_cnt} öğe hedef klasöre taşındı.",
+            'zipped'       => "{$fm_cnt} öğe ZIP paketi haline getirildi.",
+            'unzipped'     => 'ZIP arşivi çıkarıldı.',
         );
         $fm_msg = sanitize_text_field(wp_unslash($_GET['fm_msg'] ?? ''));
         $fm_err = sanitize_text_field(wp_unslash($_GET['fm_err'] ?? ''));
 
-        $entries = scandir($cur_dir);
-        $dirs = array();
-        $files = array();
-        foreach ($entries as $e) {
-            if ($e === '.' || $e === '..') continue;
-            $full = $cur_dir . '/' . $e;
-            if (is_dir($full)) {
-                $dirs[] = $e;
-            } else {
-                $files[] = $e;
+        // Gather entries (recursive if searching, otherwise current dir)
+        $rows = array();
+        $total_dirs = 0;
+        $total_files = 0;
+        $total_bytes = 0;
+
+        if ($search_q !== '') {
+            $it = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($cur_dir, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
+            foreach ($it as $item) {
+                $name = $item->getFilename();
+                if (mb_stripos($name, $search_q, 0, 'UTF-8') === false) {
+                    continue;
+                }
+                $full   = $item->getPathname();
+                $is_dir = $item->isDir();
+                $info   = $this->get_file_type_info($full, $is_dir);
+                $size   = $is_dir ? 0 : (int) $item->getSize();
+                $mtime  = (int) $item->getMTime();
+                if ($is_dir) $total_dirs++; else { $total_files++; $total_bytes += $size; }
+                $rows[] = array(
+                    'name'   => $name,
+                    'rel'    => $this->get_rel_path($full),
+                    'full'   => $full,
+                    'is_dir' => $is_dir,
+                    'type'   => $info['label'],
+                    'info'   => $info,
+                    'size'   => $size,
+                    'mtime'  => $mtime,
+                );
+            }
+        } else {
+            foreach (scandir($cur_dir) as $e) {
+                if ($e === '.' || $e === '..') continue;
+                $full   = $cur_dir . '/' . $e;
+                $is_dir = is_dir($full);
+                $info   = $this->get_file_type_info($full, $is_dir);
+                $size   = $is_dir ? 0 : (int) filesize($full);
+                $mtime  = (int) filemtime($full);
+                if ($is_dir) $total_dirs++; else { $total_files++; $total_bytes += $size; }
+                $rows[] = array(
+                    'name'   => $e,
+                    'rel'    => $this->get_rel_path($full),
+                    'full'   => $full,
+                    'is_dir' => $is_dir,
+                    'type'   => $info['label'],
+                    'info'   => $info,
+                    'size'   => $size,
+                    'mtime'  => $mtime,
+                );
             }
         }
-        natcasesort($dirs);
-        natcasesort($files);
 
-        $editable_exts = array('json', 'csv', 'xml', 'txt', 'html', 'htm', 'css', 'js', 'md', 'svg');
+        // Sort (folders first, then by selected column)
+        usort($rows, function ($a, $b) use ($sort_by, $order) {
+            if ($a['is_dir'] !== $b['is_dir']) {
+                return $a['is_dir'] ? -1 : 1;
+            }
+            $cmp = 0;
+            if ($sort_by === 'size') {
+                $cmp = $a['size'] <=> $b['size'];
+            } elseif ($sort_by === 'date') {
+                $cmp = $a['mtime'] <=> $b['mtime'];
+            } elseif ($sort_by === 'type') {
+                $cmp = strnatcasecmp($a['type'], $b['type']);
+            } else {
+                $cmp = strnatcasecmp($a['name'], $b['name']);
+            }
+            return ($order === 'desc') ? -$cmp : $cmp;
+        });
+
+        $total_items = count($rows);
+        $total_pages = max(1, (int) ceil($total_items / $per_page));
+        $paged       = min($paged, $total_pages);
+        $offset      = ($paged - 1) * $per_page;
+        $paged_rows  = array_slice($rows, $offset, $per_page);
+        $all_dirs    = $this->list_all_dirs();
+
+        $base_page_args = array(
+            'post_type' => 'ndr_api_source',
+            'page'      => 'ndr-file-manager',
+            'per_page'  => $per_page,
+            'sort'      => $sort_by,
+            'order'     => $order,
+        );
+        if ($rel_dir !== '') $base_page_args['dir'] = $rel_dir;
+        if ($search_q !== '') $base_page_args['fm_q'] = $search_q;
+
+        $sort_link = function ($col, $label) use ($base_page_args, $sort_by, $order) {
+            $next_order = ($sort_by === $col && $order === 'asc') ? 'desc' : 'asc';
+            $u = add_query_arg(array_merge($base_page_args, array('sort' => $col, 'order' => $next_order, 'paged' => 1)), admin_url('edit.php'));
+            $arrow = ($sort_by === $col) ? ($order === 'asc' ? ' ▲' : ' ▼') : '';
+            return '<a href="' . esc_url($u) . '">' . esc_html($label . $arrow) . '</a>';
+        };
         ?>
+        <style>
+            .ndr-fm-bar{background:#fff;border:1px solid #dcdcde;border-radius:6px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+            .ndr-fm-table th,.ndr-fm-table td{vertical-align:middle !important;padding:7px 10px !important;}
+            .ndr-fm-name-cell{display:flex;align-items:center;gap:8px;}
+            .ndr-fm-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:1px solid #dcdcde;background:#fff;border-radius:4px;cursor:pointer;color:#3c434a;text-decoration:none;transition:all .15s;}
+            .ndr-fm-icon-btn:hover{border-color:#2271b1;color:#2271b1;background:#f0f6fc;}
+            .ndr-fm-icon-btn.is-danger:hover{border-color:#d63638;color:#d63638;background:#fcf0f1;}
+            .ndr-fm-icon-btn .dashicons{font-size:16px;width:16px;height:16px;line-height:16px;}
+            .ndr-fm-progress-wrap{display:none;background:#fff;border:1px solid #c3dafe;border-left:4px solid #2271b1;padding:10px 14px;border-radius:4px;margin-bottom:10px;}
+            .ndr-fm-progress-bar{height:10px;background:#e2e8f0;border-radius:5px;overflow:hidden;margin-top:6px;}
+            .ndr-fm-progress-fill{height:100%;width:0%;background:#2271b1;transition:width .15s;}
+            .ndr-fm-stats-footer{background:#f6f7f7;border:1px solid #dcdcde;border-top:none;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12.5px;color:#50575e;}
+            .ndr-fm-modal-bg{display:none;position:fixed;inset:0;background:rgba(15,23,42,.75);z-index:100000;align-items:center;justify-content:center;padding:20px;}
+            .ndr-fm-modal-bg.is-open{display:flex;}
+            .ndr-fm-modal-box{background:#fff;border-radius:8px;padding:18px 20px;max-width:90vw;max-height:90vh;overflow:auto;min-width:340px;box-shadow:0 20px 50px rgba(0,0,0,.35);}
+            .CodeMirror{border:1px solid #8c8f94;border-radius:4px;height:380px;min-height:180px;resize:vertical;overflow:auto !important;font-size:13px;}
+        </style>
+
         <div class="wrap">
-            <h1><?php esc_html_e('Dosya Yöneticisi', 'ndr-rest-api-to-render'); ?></h1>
-            <p class="description">
-                <strong><?php esc_html_e('Kök Dizin:', 'ndr-rest-api-to-render'); ?></strong> <code><?php echo esc_html($root); ?></code>
-                &mdash; <a href="<?php echo esc_url(admin_url('edit.php?post_type=ndr_api_source&page=ndr-data-settings')); ?>"><?php esc_html_e('Kök Dizini Değiştir (Ayarlar)', 'ndr-rest-api-to-render'); ?></a>
-            </p>
+            <h1 style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                <span><?php esc_html_e('Dosya Yöneticisi', 'ndr-rest-api-to-render'); ?></span>
+                <span style="font-size:12.5px;font-weight:400;color:#646970;">
+                    Kök: <code><?php echo esc_html($root); ?></code>
+                    &bull; <a href="<?php echo esc_url(admin_url('edit.php?post_type=ndr_api_source&page=ndr-data-settings')); ?>"><?php esc_html_e('Değiştir', 'ndr-rest-api-to-render'); ?></a>
+                </span>
+            </h1>
 
             <?php if ($fm_msg && isset($msg_map[$fm_msg])) : ?>
                 <div class="notice notice-success is-dismissible"><p><?php echo esc_html($msg_map[$fm_msg]); ?></p></div>
@@ -359,134 +615,186 @@ class NDR_API_File_Manager
                 <div class="notice notice-error is-dismissible"><p><?php echo esc_html($fm_err); ?></p></div>
             <?php endif; ?>
 
-            <!-- Breadcrumb -->
-            <div style="background:#fff;border:1px solid #dcdcde;padding:10px 14px;border-radius:4px;margin:12px 0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                <strong><?php esc_html_e('Konum:', 'ndr-rest-api-to-render'); ?></strong>
-                <a href="<?php echo esc_url(admin_url('edit.php?post_type=ndr_api_source&page=ndr-file-manager')); ?>">🏠 Kök</a>
-                <?php
-                if ($rel_dir !== '') {
-                    $acc = '';
-                    foreach (explode('/', $rel_dir) as $part) {
-                        $acc = ($acc === '') ? $part : $acc . '/' . $part;
-                        $u = add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-file-manager', 'dir' => $acc), admin_url('edit.php'));
-                        echo ' / <a href="' . esc_url($u) . '">' . esc_html($part) . '</a>';
-                    }
-                }
-                ?>
+            <!-- Progress Indicator (Upload & Bulk Actions) -->
+            <div class="ndr-fm-progress-wrap" id="ndr-fm-progress-wrap">
+                <div style="display:flex;justify-content:space-between;font-size:13px;">
+                    <strong id="ndr-fm-progress-label">İşlem yapılıyor...</strong>
+                    <span id="ndr-fm-progress-pct">0%</span>
+                </div>
+                <div class="ndr-fm-progress-bar"><div class="ndr-fm-progress-fill" id="ndr-fm-progress-fill"></div></div>
             </div>
 
             <?php if ($is_editing) : ?>
-                <div style="background:#fff;border:1px solid #dcdcde;padding:16px;border-radius:6px;margin-bottom:16px;">
-                    <h2 style="margin-top:0;"><?php echo esc_html(sprintf(__('Dosya Düzenleniyor: %s', 'ndr-rest-api-to-render'), $edit_file)); ?></h2>
+                <div style="background:#fff;border:1px solid #dcdcde;padding:16px;border-radius:6px;margin-bottom:14px;">
+                    <h2 style="margin-top:0;"><?php echo esc_html(sprintf(__('Düzenleniyor: %s', 'ndr-rest-api-to-render'), $edit_file)); ?></h2>
                     <form method="post">
                         <?php wp_nonce_field('ndr_fm_action', 'ndr_fm_nonce'); ?>
                         <input type="hidden" name="fm_action" value="save_file" />
                         <input type="hidden" name="current_dir" value="<?php echo esc_attr($rel_dir); ?>" />
                         <input type="hidden" name="file_name" value="<?php echo esc_attr($edit_file); ?>" />
-                        <textarea name="file_content" rows="18" class="widefat" style="font-family:monospace;font-size:13px;"><?php echo esc_textarea((string) file_get_contents($edit_path)); ?></textarea>
-                        <p style="margin-top:10px;">
+                        <textarea id="ndr_fm_code_editor" name="file_content" rows="16" class="widefat ndr-code-editor" data-mode="<?php echo esc_attr($edit_info['mode'] ?: 'text/plain'); ?>"><?php echo esc_textarea((string) file_get_contents($edit_path)); ?></textarea>
+                        <p style="margin-top:10px;margin-bottom:0;">
                             <button type="submit" class="button button-primary"><?php esc_html_e('Değişiklikleri Kaydet', 'ndr-rest-api-to-render'); ?></button>
-                            <a href="<?php echo esc_url(add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-file-manager', 'dir' => $rel_dir), admin_url('edit.php'))); ?>" class="button button-secondary"><?php esc_html_e('İptal / Geri Dön', 'ndr-rest-api-to-render'); ?></a>
+                            <a href="<?php echo esc_url(add_query_arg($base_page_args, admin_url('edit.php'))); ?>" class="button button-secondary"><?php esc_html_e('Kapat', 'ndr-rest-api-to-render'); ?></a>
                         </p>
                     </form>
                 </div>
             <?php endif; ?>
 
-            <!-- Upload & Create Folder Bar -->
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-                <form method="post" enctype="multipart/form-data" style="background:#fff;border:1px solid #dcdcde;padding:12px 14px;border-radius:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                    <?php wp_nonce_field('ndr_fm_action', 'ndr_fm_nonce'); ?>
-                    <input type="hidden" name="fm_action" value="upload" />
-                    <input type="hidden" name="current_dir" value="<?php echo esc_attr($rel_dir); ?>" />
-                    <strong><?php esc_html_e('Dosya Yükle:', 'ndr-rest-api-to-render'); ?></strong>
-                    <input type="file" name="fm_files[]" multiple required />
-                    <button type="submit" class="button button-primary"><?php esc_html_e('Yükle', 'ndr-rest-api-to-render'); ?></button>
-                </form>
+            <!-- Top Bar: Breadcrumb + Recursive Search -->
+            <div class="ndr-fm-bar">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                    <span class="dashicons dashicons-portfolio" style="color:#d97706;"></span>
+                    <a href="<?php echo esc_url(admin_url('edit.php?post_type=ndr_api_source&page=ndr-file-manager&per_page=' . $per_page)); ?>"><strong>Kök</strong></a>
+                    <?php
+                    if ($rel_dir !== '') {
+                        $acc = '';
+                        foreach (explode('/', $rel_dir) as $part) {
+                            $acc = ($acc === '') ? $part : $acc . '/' . $part;
+                            $u = add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-file-manager', 'dir' => $acc, 'per_page' => $per_page), admin_url('edit.php'));
+                            echo ' / <a href="' . esc_url($u) . '">' . esc_html($part) . '</a>';
+                        }
+                    }
+                    if ($search_q !== '') {
+                        echo ' <span class="description">(&ldquo;' . esc_html($search_q) . '&rdquo; araması — alt klasörler dahil)</span>';
+                    }
+                    ?>
+                </div>
 
-                <form method="post" style="background:#fff;border:1px solid #dcdcde;padding:12px 14px;border-radius:4px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                    <?php wp_nonce_field('ndr_fm_action', 'ndr_fm_nonce'); ?>
-                    <input type="hidden" name="fm_action" value="mkdir" />
-                    <input type="hidden" name="current_dir" value="<?php echo esc_attr($rel_dir); ?>" />
-                    <strong><?php esc_html_e('Yeni Klasör:', 'ndr-rest-api-to-render'); ?></strong>
-                    <input type="text" name="folder_name" placeholder="klasor-adi" required />
-                    <button type="submit" class="button button-secondary"><?php esc_html_e('Oluştur', 'ndr-rest-api-to-render'); ?></button>
+                <form method="get" style="display:flex;gap:6px;align-items:center;">
+                    <input type="hidden" name="post_type" value="ndr_api_source" />
+                    <input type="hidden" name="page" value="ndr-file-manager" />
+                    <?php if ($rel_dir !== '') : ?><input type="hidden" name="dir" value="<?php echo esc_attr($rel_dir); ?>" /><?php endif; ?>
+                    <input type="hidden" name="per_page" value="<?php echo esc_attr($per_page); ?>" />
+                    <input type="search" name="fm_q" value="<?php echo esc_attr($search_q); ?>" placeholder="Klasör ve alt klasörlerde ara..." style="min-width:230px;" />
+                    <button type="submit" class="button button-secondary"><?php esc_html_e('Ara', 'ndr-rest-api-to-render'); ?></button>
+                    <?php if ($search_q !== '') : ?>
+                        <a href="<?php echo esc_url(add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-file-manager', 'dir' => $rel_dir, 'per_page' => $per_page), admin_url('edit.php'))); ?>" class="button"><?php esc_html_e('Temizle', 'ndr-rest-api-to-render'); ?></a>
+                    <?php endif; ?>
                 </form>
             </div>
 
-            <!-- Bulk Actions & File Table -->
+            <!-- Action Bar: Upload (AJAX with progress) + New Folder + Per-Page -->
+            <div class="ndr-fm-bar">
+                <form id="ndr-fm-upload-form" method="post" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <input type="hidden" name="ndr_fm_nonce" value="<?php echo esc_attr(wp_create_nonce('ndr_fm_action')); ?>" />
+                    <input type="hidden" name="current_dir" value="<?php echo esc_attr($rel_dir); ?>" />
+                    <span class="dashicons dashicons-upload" style="color:#2271b1;"></span>
+                    <input type="file" id="ndr-fm-upload-input" name="fm_files[]" multiple />
+                    <button type="submit" class="button button-primary button-small"><?php esc_html_e('Yükle', 'ndr-rest-api-to-render'); ?></button>
+                </form>
+
+                <form method="post" style="display:flex;gap:6px;align-items:center;">
+                    <?php wp_nonce_field('ndr_fm_action', 'ndr_fm_nonce'); ?>
+                    <input type="hidden" name="fm_action" value="mkdir" />
+                    <input type="hidden" name="current_dir" value="<?php echo esc_attr($rel_dir); ?>" />
+                    <input type="text" name="folder_name" placeholder="Yeni klasör adı" required style="width:150px;" />
+                    <button type="submit" class="button button-secondary button-small">+ <?php esc_html_e('Klasör', 'ndr-rest-api-to-render'); ?></button>
+                </form>
+
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <span class="description"><?php esc_html_e('Göster:', 'ndr-rest-api-to-render'); ?></span>
+                    <?php foreach (array(50, 100, 200) as $pp) :
+                        $pp_u = add_query_arg(array_merge($base_page_args, array('per_page' => $pp, 'paged' => 1)), admin_url('edit.php'));
+                    ?>
+                        <a href="<?php echo esc_url($pp_u); ?>" class="button button-small <?php echo ($per_page === $pp) ? 'button-primary' : ''; ?>"><?php echo $pp; ?></a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <!-- Bulk Form & Minimalist File Table -->
             <form method="post" id="ndr-fm-bulk-form">
                 <?php wp_nonce_field('ndr_fm_action', 'ndr_fm_nonce'); ?>
                 <input type="hidden" name="fm_action" value="bulk" />
                 <input type="hidden" name="current_dir" value="<?php echo esc_attr($rel_dir); ?>" />
 
-                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
                     <select name="bulk_op" id="ndr-fm-bulk-op">
                         <option value=""><?php esc_html_e('Toplu İşlemler', 'ndr-rest-api-to-render'); ?></option>
-                        <option value="zip"><?php esc_html_e('Seçilenleri ZIP Paketi Yap', 'ndr-rest-api-to-render'); ?></option>
+                        <option value="copy"><?php esc_html_e('Seçilenleri Kopyala', 'ndr-rest-api-to-render'); ?></option>
+                        <option value="move"><?php esc_html_e('Seçilenleri Taşı', 'ndr-rest-api-to-render'); ?></option>
+                        <option value="zip"><?php esc_html_e('Seçilenleri ZIP Yap', 'ndr-rest-api-to-render'); ?></option>
                         <option value="delete"><?php esc_html_e('Seçilenleri Sil', 'ndr-rest-api-to-render'); ?></option>
+                    </select>
+                    <select name="bulk_target_dir" id="ndr-fm-bulk-target" style="display:none;">
+                        <?php foreach ($all_dirs as $d_val => $d_lbl) : ?>
+                            <option value="<?php echo esc_attr($d_val); ?>"><?php echo esc_html('Hedef: ' . $d_lbl); ?></option>
+                        <?php endforeach; ?>
                     </select>
                     <button type="submit" class="button button-secondary" id="ndr-fm-bulk-apply"><?php esc_html_e('Uygula', 'ndr-rest-api-to-render'); ?></button>
                 </div>
 
-                <table class="wp-list-table widefat fixed striped">
+                <table class="wp-list-table widefat fixed striped ndr-fm-table">
                     <thead>
                         <tr>
-                            <th style="width:32px;"><input type="checkbox" id="ndr-fm-select-all" /></th>
-                            <th><?php esc_html_e('Ad', 'ndr-rest-api-to-render'); ?></th>
-                            <th style="width:110px;"><?php esc_html_e('Boyut', 'ndr-rest-api-to-render'); ?></th>
-                            <th style="width:165px;"><?php esc_html_e('Değiştirilme', 'ndr-rest-api-to-render'); ?></th>
-                            <th style="width:320px;"><?php esc_html_e('İşlemler', 'ndr-rest-api-to-render'); ?></th>
+                            <th style="width:30px;"><input type="checkbox" id="ndr-fm-select-all" /></th>
+                            <th><?php echo $sort_link('name', 'Ad'); ?></th>
+                            <th style="width:130px;"><?php echo $sort_link('type', 'Tür'); ?></th>
+                            <th style="width:100px;"><?php echo $sort_link('size', 'Boyut'); ?></th>
+                            <th style="width:145px;"><?php echo $sort_link('date', 'Değiştirilme'); ?></th>
+                            <th style="width:245px;"><?php esc_html_e('İşlemler', 'ndr-rest-api-to-render'); ?></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (empty($dirs) && empty($files)) : ?>
-                            <tr><td colspan="5"><?php esc_html_e('Bu klasör boş.', 'ndr-rest-api-to-render'); ?></td></tr>
+                        <?php if (empty($paged_rows)) : ?>
+                            <tr><td colspan="6"><?php esc_html_e('Kayıt bulunamadı.', 'ndr-rest-api-to-render'); ?></td></tr>
                         <?php endif; ?>
 
-                        <?php foreach ($dirs as $d) :
-                            $full = $cur_dir . '/' . $d;
-                            $sub_u = ($rel_dir === '') ? $d : $rel_dir . '/' . $d;
-                            $open_u = add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-file-manager', 'dir' => $sub_u), admin_url('edit.php'));
+                        <?php foreach ($paged_rows as $r) :
+                            $info    = $r['info'];
+                            $pub_url = $r['is_dir'] ? '' : $this->get_public_url($r['full']);
+                            $open_u  = $r['is_dir']
+                                ? add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-file-manager', 'dir' => $r['rel'], 'per_page' => $per_page), admin_url('edit.php'))
+                                : $pub_url;
+                            $dl_u    = wp_nonce_url(add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-file-manager', 'dir' => $rel_dir, 'fm_download' => $r['rel']), admin_url('edit.php')), 'ndr_fm_download');
+                            $ed_u    = add_query_arg(array_merge($base_page_args, array('edit' => $r['rel'])), admin_url('edit.php'));
                         ?>
                             <tr>
-                                <td><input type="checkbox" name="selected_items[]" value="<?php echo esc_attr($d); ?>" class="ndr-fm-cb" /></td>
-                                <td>📁 <a href="<?php echo esc_url($open_u); ?>"><strong><?php echo esc_html($d); ?></strong></a></td>
-                                <td>—</td>
-                                <td><?php echo esc_html(date_i18n('d.m.Y H:i', filemtime($full))); ?></td>
+                                <td><input type="checkbox" name="selected_items[]" value="<?php echo esc_attr($r['rel']); ?>" data-size="<?php echo esc_attr($r['size']); ?>" class="ndr-fm-cb" /></td>
                                 <td>
-                                    <button type="button" class="button button-small ndr-fm-rename-btn" data-name="<?php echo esc_attr($d); ?>"><?php esc_html_e('Yeniden Adlandır', 'ndr-rest-api-to-render'); ?></button>
-                                    <button type="button" class="button button-small button-link-delete ndr-fm-del-btn" data-name="<?php echo esc_attr($d); ?>"><?php esc_html_e('Sil', 'ndr-rest-api-to-render'); ?></button>
+                                    <div class="ndr-fm-name-cell">
+                                        <span class="dashicons <?php echo esc_attr($info['icon']); ?>" style="color:<?php echo esc_attr($info['color']); ?>;"></span>
+                                        <div>
+                                            <?php if ($r['is_dir']) : ?>
+                                                <a href="<?php echo esc_url($open_u); ?>"><strong><?php echo esc_html($r['name']); ?></strong></a>
+                                            <?php elseif ($info['is_img']) : ?>
+                                                <a href="<?php echo esc_url($pub_url); ?>" class="ndr-fm-img-preview" data-title="<?php echo esc_attr($r['name']); ?>"><strong><?php echo esc_html($r['name']); ?></strong></a>
+                                            <?php elseif ($info['is_edit']) : ?>
+                                                <a href="<?php echo esc_url($ed_u); ?>"><strong><?php echo esc_html($r['name']); ?></strong></a>
+                                            <?php else : ?>
+                                                <strong><?php echo esc_html($r['name']); ?></strong>
+                                            <?php endif; ?>
+                                            <?php if ($search_q !== '' && strpos($r['rel'], '/') !== false) : ?>
+                                                <div style="font-size:11px;color:#646970;">/<?php echo esc_html(dirname($r['rel'])); ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
                                 </td>
-                            </tr>
-                        <?php endforeach; ?>
-
-                        <?php foreach ($files as $f) :
-                            $full = $cur_dir . '/' . $f;
-                            $ext  = strtolower(pathinfo($f, PATHINFO_EXTENSION));
-                            $pub_url = $this->get_public_url($full);
-                            $dl_url  = wp_nonce_url(add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-file-manager', 'dir' => $rel_dir, 'fm_download' => $f), admin_url('edit.php')), 'ndr_fm_download');
-                            $ed_url  = add_query_arg(array('post_type' => 'ndr_api_source', 'page' => 'ndr-file-manager', 'dir' => $rel_dir, 'edit' => $f), admin_url('edit.php'));
-                        ?>
-                            <tr>
-                                <td><input type="checkbox" name="selected_items[]" value="<?php echo esc_attr($f); ?>" class="ndr-fm-cb" /></td>
+                                <td><span style="font-size:12px;color:#50575e;"><?php echo esc_html($r['type']); ?></span></td>
+                                <td><?php echo $r['is_dir'] ? '—' : esc_html(size_format($r['size'])); ?></td>
+                                <td><span style="font-size:12px;"><?php echo esc_html(date_i18n('d.m.Y H:i', $r['mtime'])); ?></span></td>
                                 <td>
-                                    📄 <strong><?php echo esc_html($f); ?></strong>
-                                    <?php if ($pub_url) : ?>
-                                        <button type="button" class="button-link ndr-fm-copy-url" data-url="<?php echo esc_attr($pub_url); ?>" style="font-size:11px;margin-left:6px;">[URL Kopyala]</button>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?php echo esc_html(size_format(filesize($full))); ?></td>
-                                <td><?php echo esc_html(date_i18n('d.m.Y H:i', filemtime($full))); ?></td>
-                                <td>
-                                    <a href="<?php echo esc_url($dl_url); ?>" class="button button-small"><?php esc_html_e('İndir', 'ndr-rest-api-to-render'); ?></a>
-                                    <?php if (in_array($ext, $editable_exts, true)) : ?>
-                                        <a href="<?php echo esc_url($ed_url); ?>" class="button button-small"><?php esc_html_e('Düzenle', 'ndr-rest-api-to-render'); ?></a>
-                                    <?php endif; ?>
-                                    <?php if ($ext === 'zip') : ?>
-                                        <button type="button" class="button button-small button-primary ndr-fm-unzip-btn" data-name="<?php echo esc_attr($f); ?>"><?php esc_html_e('ZIP Aç', 'ndr-rest-api-to-render'); ?></button>
-                                    <?php endif; ?>
-                                    <button type="button" class="button button-small ndr-fm-rename-btn" data-name="<?php echo esc_attr($f); ?>"><?php esc_html_e('Ad Değiştir', 'ndr-rest-api-to-render'); ?></button>
-                                    <button type="button" class="button button-small button-link-delete ndr-fm-del-btn" data-name="<?php echo esc_attr($f); ?>"><?php esc_html_e('Sil', 'ndr-rest-api-to-render'); ?></button>
+                                    <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">
+                                        <?php if ($info['is_img'] && $pub_url) : ?>
+                                            <a href="<?php echo esc_url($pub_url); ?>" class="ndr-fm-icon-btn ndr-fm-img-preview" data-title="<?php echo esc_attr($r['name']); ?>" title="Önizle"><span class="dashicons dashicons-visibility"></span></a>
+                                        <?php endif; ?>
+                                        <?php if ($info['is_edit']) : ?>
+                                            <a href="<?php echo esc_url($ed_u); ?>" class="ndr-fm-icon-btn" title="Düzenle"><span class="dashicons dashicons-edit"></span></a>
+                                        <?php endif; ?>
+                                        <?php if (! $r['is_dir']) : ?>
+                                            <a href="<?php echo esc_url($dl_u); ?>" class="ndr-fm-icon-btn" title="İndir"><span class="dashicons dashicons-download"></span></a>
+                                        <?php endif; ?>
+                                        <?php if ($pub_url) : ?>
+                                            <button type="button" class="ndr-fm-icon-btn ndr-fm-copy-url" data-url="<?php echo esc_attr($pub_url); ?>" title="URL Kopyala"><span class="dashicons dashicons-admin-links"></span></button>
+                                        <?php endif; ?>
+                                        <?php if (! $r['is_dir'] && strtolower(pathinfo($r['name'], PATHINFO_EXTENSION)) === 'zip') : ?>
+                                            <button type="button" class="ndr-fm-icon-btn ndr-fm-unzip-btn" data-name="<?php echo esc_attr($r['rel']); ?>" title="ZIP Aç"><span class="dashicons dashicons-open-folder"></span></button>
+                                        <?php endif; ?>
+                                        <button type="button" class="ndr-fm-icon-btn ndr-fm-copymove-btn" data-mode="copy" data-name="<?php echo esc_attr($r['rel']); ?>" title="Kopyala"><span class="dashicons dashicons-admin-page"></span></button>
+                                        <button type="button" class="ndr-fm-icon-btn ndr-fm-copymove-btn" data-mode="move" data-name="<?php echo esc_attr($r['rel']); ?>" title="Taşı"><span class="dashicons dashicons-migrate"></span></button>
+                                        <button type="button" class="ndr-fm-icon-btn ndr-fm-rename-btn" data-name="<?php echo esc_attr($r['rel']); ?>" data-short="<?php echo esc_attr($r['name']); ?>" title="Yeniden Adlandır"><span class="dashicons dashicons-tag"></span></button>
+                                        <button type="button" class="ndr-fm-icon-btn is-danger ndr-fm-del-btn" data-name="<?php echo esc_attr($r['rel']); ?>" data-short="<?php echo esc_attr($r['name']); ?>" title="Sil"><span class="dashicons dashicons-trash"></span></button>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -494,56 +802,203 @@ class NDR_API_File_Manager
                 </table>
             </form>
 
+            <!-- Bottom Stats & Pagination -->
+            <div class="ndr-fm-stats-footer">
+                <div>
+                    <strong>Toplam:</strong> <?php echo esc_html($total_dirs); ?> klasör, <?php echo esc_html($total_files); ?> dosya (<?php echo esc_html(size_format($total_bytes)); ?>)
+                    &bull; <strong>Seçilen:</strong> <span id="ndr-fm-selected-stats">0 öğe (0 B)</span>
+                </div>
+                <?php if ($total_pages > 1) : ?>
+                    <div style="display:flex;gap:4px;align-items:center;">
+                        <span>Sayfa <?php echo $paged; ?> / <?php echo $total_pages; ?>:</span>
+                        <?php for ($p = 1; $p <= $total_pages; $p++) :
+                            if ($p > 10 && $p < $total_pages && abs($p - $paged) > 2) continue;
+                            $pu = add_query_arg(array_merge($base_page_args, array('paged' => $p)), admin_url('edit.php'));
+                        ?>
+                            <a href="<?php echo esc_url($pu); ?>" class="button button-small <?php echo ($p === $paged) ? 'button-primary' : ''; ?>"><?php echo $p; ?></a>
+                        <?php endfor; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+
             <!-- Hidden single-action form -->
             <form method="post" id="ndr-fm-single-form" style="display:none;">
                 <?php wp_nonce_field('ndr_fm_action', 'ndr_fm_nonce'); ?>
                 <input type="hidden" name="current_dir" value="<?php echo esc_attr($rel_dir); ?>" />
                 <input type="hidden" name="fm_action" id="ndr-fm-single-action" value="" />
                 <input type="hidden" name="target_name" id="ndr-fm-single-target" value="" />
+                <input type="hidden" name="target_dir" id="ndr-fm-single-tdir" value="" />
                 <input type="hidden" name="old_name" id="ndr-fm-single-old" value="" />
                 <input type="hidden" name="new_name" id="ndr-fm-single-new" value="" />
             </form>
 
+            <!-- Image Preview Modal -->
+            <div class="ndr-fm-modal-bg" id="ndr-fm-img-modal">
+                <div class="ndr-fm-modal-box" style="text-align:center;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:12px;">
+                        <strong id="ndr-fm-img-title"></strong>
+                        <div>
+                            <a href="#" id="ndr-fm-img-newtab" target="_blank" class="button button-small">Yeni Sekmede Aç</a>
+                            <button type="button" class="button button-small" id="ndr-fm-img-close">&times; Kapat</button>
+                        </div>
+                    </div>
+                    <img id="ndr-fm-img-el" src="" alt="" style="max-width:80vw;max-height:72vh;border-radius:6px;border:1px solid #dcdcde;" />
+                </div>
+            </div>
+
+            <!-- Copy / Move Target Modal -->
+            <div class="ndr-fm-modal-bg" id="ndr-fm-cm-modal">
+                <div class="ndr-fm-modal-box">
+                    <h3 id="ndr-fm-cm-title" style="margin-top:0;">Hedef Klasör Seçin</h3>
+                    <p><select id="ndr-fm-cm-select" class="widefat">
+                        <?php foreach ($all_dirs as $d_val => $d_lbl) : ?>
+                            <option value="<?php echo esc_attr($d_val); ?>"><?php echo esc_html($d_lbl); ?></option>
+                        <?php endforeach; ?>
+                    </select></p>
+                    <p style="margin-bottom:0;display:flex;gap:8px;justify-content:flex-end;">
+                        <button type="button" class="button" id="ndr-fm-cm-cancel">İptal</button>
+                        <button type="button" class="button button-primary" id="ndr-fm-cm-confirm">Onayla</button>
+                    </p>
+                </div>
+            </div>
+
             <script>
             jQuery(function($){
+                function fmtBytes(b) {
+                    if (!b) return '0 B';
+                    var k = 1024, sizes = ['B','KB','MB','GB'], i = Math.floor(Math.log(b)/Math.log(k));
+                    return (b/Math.pow(k,i)).toFixed(i?1:0) + ' ' + sizes[i];
+                }
+                function updateSelStats() {
+                    var cnt = 0, bytes = 0;
+                    $('.ndr-fm-cb:checked').each(function(){
+                        cnt++;
+                        bytes += parseInt($(this).data('size'), 10) || 0;
+                    });
+                    $('#ndr-fm-selected-stats').text(cnt + ' öğe (' + fmtBytes(bytes) + ')');
+                }
                 $('#ndr-fm-select-all').on('change', function(){
                     $('.ndr-fm-cb').prop('checked', $(this).is(':checked'));
+                    updateSelStats();
                 });
+                $(document).on('change', '.ndr-fm-cb', updateSelStats);
+
+                // Bulk op toggle target dir
+                $('#ndr-fm-bulk-op').on('change', function(){
+                    var v = $(this).val();
+                    if (v === 'copy' || v === 'move') $('#ndr-fm-bulk-target').show();
+                    else $('#ndr-fm-bulk-target').hide();
+                });
+
                 $('#ndr-fm-bulk-form').on('submit', function(e){
                     var op = $('#ndr-fm-bulk-op').val();
-                    if (!op) { e.preventDefault(); alert('Lütfen bir toplu işlem seçin.'); return; }
-                    if (op === 'delete' && !confirm('Seçilen dosya/klasörleri silmek istediğinize emin misiniz?')) {
-                        e.preventDefault();
+                    var cnt = $('.ndr-fm-cb:checked').length;
+                    if (!op || !cnt) { e.preventDefault(); alert('Lütfen öğe ve toplu işlem seçin.'); return; }
+                    if (op === 'delete' && !confirm('Seçilen ' + cnt + ' öğeyi silmek istediğinize emin misiniz?')) {
+                        e.preventDefault(); return;
                     }
+                    $('#ndr-fm-progress-wrap').show();
+                    $('#ndr-fm-progress-label').text('Toplu işlem yürütülüyor (' + cnt + ' öğe)...');
+                    $('#ndr-fm-progress-pct').text('İşleniyor');
+                    $('#ndr-fm-progress-fill').css('width', '65%');
                 });
+
+                // AJAX Upload with Real Progress Bar
+                $('#ndr-fm-upload-form').on('submit', function(e){
+                    e.preventDefault();
+                    var files = $('#ndr-fm-upload-input')[0].files;
+                    if (!files.length) { alert('Lütfen dosya seçin.'); return; }
+                    var fd = new FormData(this);
+                    fd.append('action', 'ndr_fm_upload');
+                    $('#ndr-fm-progress-wrap').show();
+                    $('#ndr-fm-progress-label').text('Dosyalar yükleniyor (' + files.length + ' dosya)...');
+                    $('#ndr-fm-progress-pct').text('0%');
+                    $('#ndr-fm-progress-fill').css('width', '0%');
+
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('POST', ajaxurl, true);
+                    xhr.upload.onprogress = function(ev) {
+                        if (ev.lengthComputable) {
+                            var pct = Math.round((ev.loaded / ev.total) * 100);
+                            $('#ndr-fm-progress-pct').text(pct + '% (' + fmtBytes(ev.loaded) + ' / ' + fmtBytes(ev.total) + ')');
+                            $('#ndr-fm-progress-fill').css('width', pct + '%');
+                        }
+                    };
+                    xhr.onload = function() {
+                        try {
+                            var res = JSON.parse(xhr.responseText);
+                            if (res && res.success) {
+                                $('#ndr-fm-progress-pct').text('Tamamlandı!');
+                                window.location.reload();
+                            } else {
+                                alert((res && res.data && res.data.message) ? res.data.message : 'Yükleme hatası.');
+                            }
+                        } catch (err) { alert('Sunucu yanıtı okunamadı.'); }
+                    };
+                    xhr.send(fd);
+                });
+
+                // Single Actions
                 $('.ndr-fm-del-btn').on('click', function(){
-                    var name = $(this).data('name');
-                    if (!confirm(name + ' silinsin mi?')) return;
+                    var name = $(this).data('name'), sh = $(this).data('short');
+                    if (!confirm(sh + ' silinsin mi?')) return;
                     $('#ndr-fm-single-action').val('delete_one');
                     $('#ndr-fm-single-target').val(name);
                     $('#ndr-fm-single-form').submit();
                 });
                 $('.ndr-fm-unzip-btn').on('click', function(){
                     var name = $(this).data('name');
-                    if (!confirm(name + ' arşivi mevcut klasöre açılsın mı?')) return;
+                    if (!confirm(name + ' arşivi açılsın mı?')) return;
+                    $('#ndr-fm-progress-wrap').show();
+                    $('#ndr-fm-progress-label').text('ZIP arşivi açılıyor...');
+                    $('#ndr-fm-progress-fill').css('width', '70%');
                     $('#ndr-fm-single-action').val('unzip');
                     $('#ndr-fm-single-target').val(name);
                     $('#ndr-fm-single-form').submit();
                 });
                 $('.ndr-fm-rename-btn').on('click', function(){
-                    var oldName = $(this).data('name');
-                    var newName = prompt('Yeni ad:', oldName);
-                    if (!newName || newName === oldName) return;
+                    var oldRel = $(this).data('name'), sh = $(this).data('short');
+                    var newName = prompt('Yeni ad:', sh);
+                    if (!newName || newName === sh) return;
                     $('#ndr-fm-single-action').val('rename');
-                    $('#ndr-fm-single-old').val(oldName);
+                    $('#ndr-fm-single-old').val(oldRel);
                     $('#ndr-fm-single-new').val(newName);
                     $('#ndr-fm-single-form').submit();
                 });
                 $('.ndr-fm-copy-url').on('click', function(){
                     var $b = $(this), u = $b.data('url');
                     if (navigator.clipboard) navigator.clipboard.writeText(u);
-                    $b.text('[Kopyalandı!]');
-                    setTimeout(function(){ $b.text('[URL Kopyala]'); }, 1400);
+                    $b.css('color', '#00a32a');
+                    setTimeout(function(){ $b.css('color', ''); }, 1200);
+                });
+
+                // Image Preview Modal
+                $('.ndr-fm-img-preview').on('click', function(e){
+                    e.preventDefault();
+                    var url = $(this).attr('href'), t = $(this).data('title');
+                    $('#ndr-fm-img-title').text(t);
+                    $('#ndr-fm-img-el').attr('src', url);
+                    $('#ndr-fm-img-newtab').attr('href', url);
+                    $('#ndr-fm-img-modal').addClass('is-open');
+                });
+                $('#ndr-fm-img-close, #ndr-fm-img-modal').on('click', function(e){
+                    if (e.target === this) $('#ndr-fm-img-modal').removeClass('is-open');
+                });
+
+                // Single Copy/Move Modal
+                var cmMode = '', cmTarget = '';
+                $('.ndr-fm-copymove-btn').on('click', function(){
+                    cmMode = $(this).data('mode');
+                    cmTarget = $(this).data('name');
+                    $('#ndr-fm-cm-title').text((cmMode === 'copy' ? 'Kopyala: ' : 'Taşı: ') + cmTarget);
+                    $('#ndr-fm-cm-modal').addClass('is-open');
+                });
+                $('#ndr-fm-cm-cancel').on('click', function(){ $('#ndr-fm-cm-modal').removeClass('is-open'); });
+                $('#ndr-fm-cm-confirm').on('click', function(){
+                    $('#ndr-fm-single-action').val(cmMode === 'copy' ? 'copy_one' : 'move_one');
+                    $('#ndr-fm-single-target').val(cmTarget);
+                    $('#ndr-fm-single-tdir').val($('#ndr-fm-cm-select').val());
+                    $('#ndr-fm-single-form').submit();
                 });
             });
             </script>
