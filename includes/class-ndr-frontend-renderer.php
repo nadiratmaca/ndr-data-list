@@ -111,11 +111,25 @@ class NDR_API_Frontend_Renderer
     {
         $gvars = self::get_global_vars();
         $html = preg_replace_callback('/\{\{\s*([^}]+?)\s*\}\}/', function ($m) use ($item, $gvars) {
-            $key = trim($m[1]);
-            if (isset($gvars[$key])) {
-                return htmlspecialchars($gvars[$key], ENT_QUOTES, 'UTF-8');
+            $expr = trim($m[1]);
+            if (preg_match('/^join\s*:\s*(["\'])(.*?)\1\s*:\s*(.+)$/i', $expr, $jm)) {
+                $sep    = $jm[2];
+                $fields = array_map('trim', explode(',', $jm[3]));
+                $parts  = array();
+                foreach ($fields as $f) {
+                    if ($f === '') continue;
+                    $val = isset($gvars[$f]) ? $gvars[$f] : self::get_value($item, $f);
+                    $val = trim((string) $val);
+                    if ($val !== '') {
+                        $parts[] = htmlspecialchars($val, ENT_QUOTES, 'UTF-8');
+                    }
+                }
+                return implode(htmlspecialchars($sep, ENT_QUOTES, 'UTF-8'), $parts);
             }
-            return htmlspecialchars(self::get_value($item, $key), ENT_QUOTES, 'UTF-8');
+            if (isset($gvars[$expr])) {
+                return htmlspecialchars($gvars[$expr], ENT_QUOTES, 'UTF-8');
+            }
+            return htmlspecialchars(self::get_value($item, $expr), ENT_QUOTES, 'UTF-8');
         }, $template);
 
         $html = preg_replace_callback('/\$\{\s*([^}]+?)\s*\}/', function ($m) use ($item) {
@@ -554,9 +568,25 @@ class NDR_API_Frontend_Renderer
             function renderItem(tpl, item) {
                 return tpl
                     .replace(/\{\{\s*([^}]+?)\s*\}\}/g, function(_, k){
-                        var key = k.trim();
-                        if (cfg.globalVars && Object.prototype.hasOwnProperty.call(cfg.globalVars, key)) return escHtml(cfg.globalVars[key]);
-                        return escHtml(getVal(item, key));
+                        var expr = k.trim();
+                        var jm = expr.match(/^join\s*:\s*(["'])(.*?)\1\s*:\s*(.+)$/i);
+                        if (jm) {
+                            var sep = jm[2];
+                            var fields = jm[3].split(',');
+                            var parts = [];
+                            for (var i = 0; i < fields.length; i++) {
+                                var f = fields[i].trim();
+                                if (!f) continue;
+                                var v = (cfg.globalVars && Object.prototype.hasOwnProperty.call(cfg.globalVars, f))
+                                    ? String(cfg.globalVars[f])
+                                    : getVal(item, f);
+                                v = v.trim();
+                                if (v !== '') parts.push(escHtml(v));
+                            }
+                            return parts.join(escHtml(sep));
+                        }
+                        if (cfg.globalVars && Object.prototype.hasOwnProperty.call(cfg.globalVars, expr)) return escHtml(cfg.globalVars[expr]);
+                        return escHtml(getVal(item, expr));
                     })
                     .replace(/\$\{\s*([^}]+?)\s*\}/g, function(_, k){
                         var expr = k.trim();
