@@ -138,6 +138,13 @@ class NDR_API_Settings_Page
                         <input type="text" id="ndr_fm_root_dir" name="fm_root_dir" class="regular-text" style="min-width:360px;font-family:monospace;" value="<?php echo esc_attr($s['fm_root_dir']); ?>" placeholder="wp-content/uploads/ndr-files" />
                         <br /><span class="description"><?php esc_html_e('Örnek: wp-content/uploads/ndr-files veya wp-content/uploads (WordPress ana dizini dışına çıkılamaz).', 'ndr-rest-api-to-render'); ?></span>
                     </p>
+                    <div style="background:#f0f6fc;border:1px solid #c3dafe;border-left:4px solid #2271b1;padding:10px 14px;border-radius:4px;font-size:13px;">
+                        <strong><?php esc_html_e('Şablonda ve İçerikte Kullanım:', 'ndr-rest-api-to-render'); ?></strong><br />
+                        &bull; <?php esc_html_e('Şablon HTML içinde:', 'ndr-rest-api-to-render'); ?> <code>{{root_url}}</code> &rarr; <code><?php echo esc_html(class_exists('NDR_API_File_Manager') ? NDR_API_File_Manager::get_root_url() : ''); ?></code>
+                        <br />&nbsp;&nbsp;<em><?php esc_html_e('Örnek:', 'ndr-rest-api-to-render'); ?></em> <code>&lt;img src="{{root_url}}/gorseller/{{resim}}" alt="{{title}}" /&gt;</code> <?php esc_html_e('veya', 'ndr-rest-api-to-render'); ?> <code>&lt;a href="{{root_url}}/{{dosya}}"&gt;İndir&lt;/a&gt;</code><br />
+                        &bull; <?php esc_html_e('Kök dizin yolu değişkeni:', 'ndr-rest-api-to-render'); ?> <code>{{root_dir}}</code><br />
+                        &bull; <?php esc_html_e('Sayfa/yazı içinde Shortcode:', 'ndr-rest-api-to-render'); ?> <code>[ndr_root_url]</code>
+                    </div>
                 </div>
 
                 <div style="background:#fff;border:1px solid #dcdcde;border-radius:6px;padding:16px 20px;margin:16px 0;">

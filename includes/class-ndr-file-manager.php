@@ -10,6 +10,7 @@ class NDR_API_File_Manager
         add_action('admin_menu', array($this, 'register_menu'), 24);
         add_action('admin_init', array($this, 'handle_actions'));
         add_action('wp_ajax_ndr_fm_upload', array($this, 'ajax_upload'));
+        add_shortcode('ndr_root_url', array(__CLASS__, 'get_root_url'));
         add_action('wp_ajax_ndr_fm_check_conflicts', array($this, 'ajax_check_conflicts'));
     }
 
@@ -44,6 +45,17 @@ class NDR_API_File_Manager
             $real_root = realpath($fallback);
         }
         return rtrim($real_root, '/');
+    }
+
+    public static function get_root_url()
+    {
+        $root = self::get_root_dir();
+        $absp = rtrim(realpath(ABSPATH), '/');
+        if ($absp && strpos($root, $absp) === 0) {
+            $rel = ltrim(substr($root, strlen($absp)), '/');
+            return untrailingslashit(trailingslashit(site_url('/')) . str_replace('%2F', '/', rawurlencode($rel)));
+        }
+        return '';
     }
 
     private function resolve_safe_path($subpath = '')

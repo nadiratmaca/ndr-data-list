@@ -95,10 +95,27 @@ class NDR_API_Frontend_Renderer
         return $out;
     }
 
+    public static function get_global_vars()
+    {
+        $settings = class_exists('NDR_API_Settings_Page') ? NDR_API_Settings_Page::get_settings() : array();
+        $root_dir = trim((string) ($settings['fm_root_dir'] ?? 'wp-content/uploads/ndr-files'), '/');
+        $root_url = class_exists('NDR_API_File_Manager') ? NDR_API_File_Manager::get_root_url() : '';
+        return array(
+            'root_url'    => $root_url,
+            'fm_root_url' => $root_url,
+            'root_dir'    => $root_dir,
+        );
+    }
+
     public static function render_item($template, $item)
     {
-        $html = preg_replace_callback('/\{\{\s*([^}]+?)\s*\}\}/', function ($m) use ($item) {
-            return htmlspecialchars(self::get_value($item, trim($m[1])), ENT_QUOTES, 'UTF-8');
+        $gvars = self::get_global_vars();
+        $html = preg_replace_callback('/\{\{\s*([^}]+?)\s*\}\}/', function ($m) use ($item, $gvars) {
+            $key = trim($m[1]);
+            if (isset($gvars[$key])) {
+                return htmlspecialchars($gvars[$key], ENT_QUOTES, 'UTF-8');
+            }
+            return htmlspecialchars(self::get_value($item, $key), ENT_QUOTES, 'UTF-8');
         }, $template);
 
         $html = preg_replace_callback('/\$\{\s*([^}]+?)\s*\}/', function ($m) use ($item) {
@@ -511,6 +528,7 @@ class NDR_API_Frontend_Renderer
                 'emptyMessage'    => $cfg['empty_message'] ?: 'Gösterilecek veri bulunamadı.',
                 'customJs'        => trim(($g_settings['global_js'] ?? '') . "\n" . ($cfg['template_js'] ?? '')),
                 'enableLightbox'  => $enable_lb,
+                'globalVars'      => self::get_global_vars(),
                 'presets'         => NDR_API_Template_Manager::get_default_presets(),
             ), JSON_UNESCAPED_UNICODE); ?>;
 
@@ -535,7 +553,11 @@ class NDR_API_Frontend_Renderer
 
             function renderItem(tpl, item) {
                 return tpl
-                    .replace(/\{\{\s*([^}]+?)\s*\}\}/g, function(_, k){ return escHtml(getVal(item, k.trim())); })
+                    .replace(/\{\{\s*([^}]+?)\s*\}\}/g, function(_, k){
+                        var key = k.trim();
+                        if (cfg.globalVars && Object.prototype.hasOwnProperty.call(cfg.globalVars, key)) return escHtml(cfg.globalVars[key]);
+                        return escHtml(getVal(item, key));
+                    })
                     .replace(/\$\{\s*([^}]+?)\s*\}/g, function(_, k){
                         var expr = k.trim();
                         if (expr.indexOf('item.') === 0) expr = expr.slice(5);

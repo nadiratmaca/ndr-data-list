@@ -183,6 +183,7 @@ class NDR_API_Template_Manager
             <p>
                 <label for="ndr_tpl_html"><strong><?php esc_html_e('Öğe HTML Şablonu ({{alan_adi}} değişkenleri ile)', 'ndr-rest-api-to-render'); ?></strong></label>
                 <textarea id="ndr_tpl_html" name="ndr_tpl_html" rows="9" class="widefat ndr-code-editor" data-mode="htmlmixed"><?php echo esc_textarea($cfg['template_html']); ?></textarea>
+                <span class="description"><?php esc_html_e('Hazır sistem değişkenleri: {{root_url}} (Dosya Yöneticisi kök dizin URL\'i, ör. <img src="{{root_url}}/{{resim}}" />), {{root_dir}} (kök dizin yolu).', 'ndr-rest-api-to-render'); ?></span>
             </p>
             <div class="ndr-tpl-grid">
                 <div>
