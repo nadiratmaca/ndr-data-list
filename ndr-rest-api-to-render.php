@@ -78,7 +78,7 @@ if (! class_exists('NDR_REST_API_To_Render')) {
 
             if (isset($submenu[$parent]) && is_array($submenu[$parent])) {
                 $order = array(
-                    'edit.php?post_type=gs_sheet_manager' => 1,
+                    'edit.php?post_type=ndr_datalist_source' => 1,
                     'edit.php?post_type=ndr_api_source'   => 2,
                     'edit.php?post_type=ndr_api_template' => 3,
                     'ndr-file-manager'                    => 4,
@@ -301,7 +301,7 @@ JS;
 
             $data_source_id = absint(get_post_meta($post->ID, '_ndr_data_source_id', true));
             $api_url        = get_post_meta($post->ID, '_ndr_api_url', true);
-            $data_sources   = get_posts(array('post_type' => 'gs_sheet_manager', 'posts_per_page' => -1, 'post_status' => 'publish', 'orderby' => 'title', 'order' => 'ASC'));
+            $data_sources   = get_posts(array('post_type' => 'ndr_datalist_source', 'posts_per_page' => -1, 'post_status' => 'publish', 'orderby' => 'title', 'order' => 'ASC'));
             $pre_filter    = (string) get_post_meta($post->ID, '_ndr_pre_filter', true);
             $template_id   = absint(get_post_meta($post->ID, '_ndr_template_id', true));
             $field_map_raw = get_post_meta($post->ID, '_ndr_field_map', true);
@@ -367,7 +367,7 @@ JS;
                         $ds_urls = array();
                         $ud = wp_upload_dir();
                         foreach ($data_sources as $ds) {
-                            $ds_urls[$ds->ID] = trailingslashit($ud['baseurl']) . 'gs-api-storage/' . absint($ds->ID) . '/data.json';
+                            $ds_urls[$ds->ID] = trailingslashit($ud['baseurl']) . 'ndr-datalist-api-storage/' . absint($ds->ID) . '/data.json';
                         }
                         ?>
                         <select id="ndr_data_source_id" name="ndr_data_source_id" class="widefat">
@@ -412,9 +412,9 @@ JS;
                 $raw_items_tmp = array();
                 if ($data_source_id > 0) {
                     $ud_tmp = wp_upload_dir();
-                    $lf = trailingslashit($ud_tmp['basedir']) . 'gs-api-storage/' . $data_source_id . '/data.json';
+                    $lf = trailingslashit($ud_tmp['basedir']) . 'ndr-datalist-api-storage/' . $data_source_id . '/data.json';
                     if (! file_exists($lf)) {
-                        $lf = trailingslashit($ud_tmp['basedir']) . 'gs-api-storage/' . $data_source_id . '/latest.json';
+                        $lf = trailingslashit($ud_tmp['basedir']) . 'ndr-datalist-api-storage/' . $data_source_id . '/latest.json';
                     }
                     if (file_exists($lf)) {
                         $dec_tmp = json_decode((string) file_get_contents($lf), true);
@@ -802,7 +802,7 @@ JS;
                 $pre_f = trim((string) get_post_meta($post_id, '_ndr_pre_filter', true));
                 if ($ds_id > 0) {
                     $ud = wp_upload_dir();
-                    $lf = trailingslashit($ud['basedir']) . 'gs-api-storage/' . $ds_id . '/data.json';
+                    $lf = trailingslashit($ud['basedir']) . 'ndr-datalist-api-storage/' . $ds_id . '/data.json';
                     if (file_exists($lf)) {
                         $dec = json_decode((string) file_get_contents($lf), true);
                         if (is_array($dec)) {
@@ -1068,7 +1068,7 @@ JS;
             $loaded_local   = false;
             if ($data_source_id > 0) {
                 $ud         = wp_upload_dir();
-                $local_dir  = trailingslashit($ud['basedir']) . 'gs-api-storage/' . $data_source_id . '/';
+                $local_dir  = trailingslashit($ud['basedir']) . 'ndr-datalist-api-storage/' . $data_source_id . '/';
                 $local_file = file_exists($local_dir . 'data.json') ? $local_dir . 'data.json' : (file_exists($local_dir . 'latest.json') ? $local_dir . 'latest.json' : '');
                 if ($local_file) {
                     $decoded = json_decode((string) file_get_contents($local_file), true);
@@ -1158,7 +1158,7 @@ JS;
         
     }
 
-    new GS_Sheet_Manager();
+    new NDR_Data_Source_Manager();
     new NDR_API_Template_Manager();
     new NDR_API_Settings_Page();
     new NDR_API_File_Manager();

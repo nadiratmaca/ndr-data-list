@@ -37,10 +37,10 @@
     function syncHiddenField() {
         var mapping = [];
 
-        $('#gs-sheet-manager-schema-container tbody tr').each(function () {
-            var header = $(this).find('.gs-sheet-manager-header').val();
-            var key = $(this).find('.gs-sheet-manager-key').val();
-            var active = $(this).find('.gs-sheet-manager-active').is(':checked') ? 1 : 0;
+        $('#ndr-datalist-schema-container tbody tr').each(function () {
+            var header = $(this).find('.ndr-datalist-header').val();
+            var key = $(this).find('.ndr-datalist-key').val();
+            var active = $(this).find('.ndr-datalist-active').is(':checked') ? 1 : 0;
 
             mapping.push({
                 header: header,
@@ -49,7 +49,7 @@
             });
         });
 
-        $('#gs_sheet_manager_mapping_rules').val(JSON.stringify(mapping));
+        $('#ndr_datalist_mapping_rules').val(JSON.stringify(mapping));
     }
 
     /**
@@ -58,19 +58,19 @@
      * @param {Array} headers Sheet headers.
      */
     function buildSchemaRows(headers) {
-        var html = '<table class="gs-sheet-manager-table"><thead><tr><th>Aktif</th><th>Sütun Başlığı</th><th>Değişken Adı</th></tr></thead><tbody>';
+        var html = '<table class="ndr-datalist-table"><thead><tr><th>Aktif</th><th>Sütun Başlığı</th><th>Değişken Adı</th></tr></thead><tbody>';
 
         headers.forEach(function (header) {
             var key = normalizeKey(header);
             html += '<tr>' +
-                '<td style="text-align:center;"><input type="checkbox" class="gs-sheet-manager-active" value="1" checked /></td>' +
-                '<td><input type="text" class="widefat gs-sheet-manager-header" value="' + escAttr(header) + '" readonly /></td>' +
-                '<td><input type="text" class="widefat gs-sheet-manager-key" value="' + escAttr(key) + '" /></td>' +
+                '<td style="text-align:center;"><input type="checkbox" class="ndr-datalist-active" value="1" checked /></td>' +
+                '<td><input type="text" class="widefat ndr-datalist-header" value="' + escAttr(header) + '" readonly /></td>' +
+                '<td><input type="text" class="widefat ndr-datalist-key" value="' + escAttr(key) + '" /></td>' +
                 '</tr>';
         });
 
         html += '</tbody></table>';
-        $('#gs-sheet-manager-schema-container').html(html);
+        $('#ndr-datalist-schema-container').html(html);
         syncHiddenField();
     }
 
@@ -82,24 +82,24 @@
     function submitSyncForm(postId) {
         syncHiddenField();
 
-        var sourceType = $('#gs_source_type').val() || 'google_sheet';
-        var sheetUrl = $('#gs_sheet_manager_sheet_url').val();
-        var uploadedUrl = $('#gs_uploaded_file_url').val();
-        var mappingRules = $('#gs_sheet_manager_mapping_rules').val();
+        var sourceType = $('#ndr_datalist_source_type').val() || 'google_sheet';
+        var sheetUrl = $('#ndr_datalist_sheet_url').val();
+        var uploadedUrl = $('#ndr_datalist_uploaded_file_url').val();
+        var mappingRules = $('#ndr_datalist_mapping_rules').val();
 
         var $form = $('<form>', {
             method: 'post',
-            action: gsSheetManagerData.ajaxUrl.replace(/admin-ajax\.php$/, 'admin-post.php'),
+            action: ndrDatalistData.ajaxUrl.replace(/admin-ajax\.php$/, 'admin-post.php'),
             style: 'display:none;',
         });
 
-        $form.append('<input type="hidden" name="action" value="gs_sheet_manager_sync" />');
+        $form.append('<input type="hidden" name="action" value="ndr_datalist_sync" />');
         $form.append('<input type="hidden" name="post_id" value="' + postId + '" />');
-        $form.append('<input type="hidden" name="gs_source_type" value="' + escAttr(sourceType) + '" />');
-        $form.append('<input type="hidden" name="gs_sheet_manager_sheet_url" value="' + escAttr(sheetUrl) + '" />');
-        $form.append('<input type="hidden" name="gs_uploaded_file_url" value="' + escAttr(uploadedUrl) + '" />');
-        $form.append('<input type="hidden" name="gs_sheet_manager_mapping_rules" value="' + escAttr(mappingRules) + '" />');
-        $form.append('<input type="hidden" name="gs_sheet_manager_sync_nonce" value="' + escAttr(gsSheetManagerData.syncNonce) + '" />');
+        $form.append('<input type="hidden" name="ndr_datalist_source_type" value="' + escAttr(sourceType) + '" />');
+        $form.append('<input type="hidden" name="ndr_datalist_sheet_url" value="' + escAttr(sheetUrl) + '" />');
+        $form.append('<input type="hidden" name="ndr_datalist_uploaded_file_url" value="' + escAttr(uploadedUrl) + '" />');
+        $form.append('<input type="hidden" name="ndr_datalist_mapping_rules" value="' + escAttr(mappingRules) + '" />');
+        $form.append('<input type="hidden" name="ndr_datalist_sync_nonce" value="' + escAttr(ndrDatalistData.syncNonce) + '" />');
 
         $('body').append($form);
         $form.submit();
@@ -114,14 +114,14 @@
     function submitDeleteVersionForm(postId, fileName) {
         var $form = $('<form>', {
             method: 'post',
-            action: gsSheetManagerData.ajaxUrl.replace(/admin-ajax\.php$/, 'admin-post.php'),
+            action: ndrDatalistData.ajaxUrl.replace(/admin-ajax\.php$/, 'admin-post.php'),
             style: 'display:none;',
         });
 
-        $form.append('<input type="hidden" name="action" value="gs_sheet_manager_delete_version" />');
+        $form.append('<input type="hidden" name="action" value="ndr_datalist_delete_version" />');
         $form.append('<input type="hidden" name="post_id" value="' + escAttr(postId) + '" />');
         $form.append('<input type="hidden" name="file_name" value="' + escAttr(fileName) + '" />');
-        $form.append('<input type="hidden" name="gs_sheet_manager_delete_nonce" value="' + escAttr(gsSheetManagerData.deleteNonce) + '" />');
+        $form.append('<input type="hidden" name="ndr_datalist_delete_nonce" value="' + escAttr(ndrDatalistData.deleteNonce) + '" />');
 
         $('body').append($form);
         $form.submit();
@@ -136,14 +136,14 @@
     function submitActivateVersionForm(postId, fileName) {
         var $form = $('<form>', {
             method: 'post',
-            action: gsSheetManagerData.ajaxUrl.replace(/admin-ajax\.php$/, 'admin-post.php'),
+            action: ndrDatalistData.ajaxUrl.replace(/admin-ajax\.php$/, 'admin-post.php'),
             style: 'display:none;',
         });
 
-        $form.append('<input type="hidden" name="action" value="gs_sheet_manager_activate_version" />');
+        $form.append('<input type="hidden" name="action" value="ndr_datalist_activate_version" />');
         $form.append('<input type="hidden" name="post_id" value="' + escAttr(postId) + '" />');
         $form.append('<input type="hidden" name="file_name" value="' + escAttr(fileName) + '" />');
-        $form.append('<input type="hidden" name="gs_sheet_manager_activate_nonce" value="' + escAttr(gsSheetManagerData.activateNonce) + '" />');
+        $form.append('<input type="hidden" name="ndr_datalist_activate_nonce" value="' + escAttr(ndrDatalistData.activateNonce) + '" />');
 
         $('body').append($form);
         $form.submit();
@@ -153,8 +153,8 @@
      * Update bulk delete button state and label.
      */
     function updateBulkDeleteState() {
-        var count = $('.gs-sheet-manager-version-cb:checked').length;
-        var $btn = $('#gs-sheet-manager-bulk-delete-btn');
+        var count = $('.ndr-datalist-version-cb:checked').length;
+        var $btn = $('#ndr-datalist-bulk-delete-btn');
         if (count > 0) {
             $btn.prop('disabled', false).text('Seçilenleri Sil (' + count + ')');
         } else {
@@ -171,13 +171,13 @@
     function submitBulkDeleteForm(postId, fileNames) {
         var $form = $('<form>', {
             method: 'post',
-            action: gsSheetManagerData.ajaxUrl.replace(/admin-ajax\.php$/, 'admin-post.php'),
+            action: ndrDatalistData.ajaxUrl.replace(/admin-ajax\.php$/, 'admin-post.php'),
             style: 'display:none;',
         });
 
-        $form.append('<input type="hidden" name="action" value="gs_sheet_manager_bulk_delete_versions" />');
+        $form.append('<input type="hidden" name="action" value="ndr_datalist_bulk_delete_versions" />');
         $form.append('<input type="hidden" name="post_id" value="' + escAttr(postId) + '" />');
-        $form.append('<input type="hidden" name="gs_sheet_manager_bulk_delete_nonce" value="' + escAttr(gsSheetManagerData.bulkDeleteNonce) + '" />');
+        $form.append('<input type="hidden" name="ndr_datalist_bulk_delete_nonce" value="' + escAttr(ndrDatalistData.bulkDeleteNonce) + '" />');
 
         fileNames.forEach(function (name) {
             $form.append('<input type="hidden" name="file_names[]" value="' + escAttr(name) + '" />');
@@ -189,19 +189,19 @@
 
     $(document).ready(function () {
         function toggleSourceInputs() {
-            var type = $('#gs_source_type').val() || 'google_sheet';
+            var type = $('#ndr_datalist_source_type').val() || 'google_sheet';
             if (type === 'upload') {
-                $('#gs-url-input-wrap').hide();
-                $('#gs-upload-input-wrap').show();
+                $('#ndr-datalist-url-input-wrap').hide();
+                $('#ndr-datalist-upload-input-wrap').show();
             } else {
-                $('#gs-url-input-wrap').show();
-                $('#gs-upload-input-wrap').hide();
+                $('#ndr-datalist-url-input-wrap').show();
+                $('#ndr-datalist-upload-input-wrap').hide();
             }
         }
         toggleSourceInputs();
-        $(document).on('change', '#gs_source_type', toggleSourceInputs);
+        $(document).on('change', '#ndr_datalist_source_type', toggleSourceInputs);
 
-        $(document).on('click', '#gs-upload-media-btn', function (e) {
+        $(document).on('click', '#ndr-datalist-upload-media-btn', function (e) {
             e.preventDefault();
             if (!window.wp || !wp.media) {
                 alert('WordPress Medya Yükleyici yüklenemedi.');
@@ -214,16 +214,16 @@
             });
             frame.on('select', function () {
                 var att = frame.state().get('selection').first().toJSON();
-                $('#gs_uploaded_file_url').val(att.url);
-                $('#gs_uploaded_file_id').val(att.id);
+                $('#ndr_datalist_uploaded_file_url').val(att.url);
+                $('#ndr_datalist_uploaded_file_id').val(att.id);
             });
             frame.open();
         });
 
-        $(document).on('click', '#gs-sheet-manager-analyze-button', function () {
-            var sourceType = $('#gs_source_type').val() || 'google_sheet';
-            var sheetUrl = $('#gs_sheet_manager_sheet_url').val();
-            var uploadedUrl = $('#gs_uploaded_file_url').val();
+        $(document).on('click', '#ndr-datalist-analyze-button', function () {
+            var sourceType = $('#ndr_datalist_source_type').val() || 'google_sheet';
+            var sheetUrl = $('#ndr_datalist_sheet_url').val();
+            var uploadedUrl = $('#ndr_datalist_uploaded_file_url').val();
 
             if (sourceType === 'upload' && !uploadedUrl) {
                 alert('Lütfen bir dosya yükleyin veya seçin.');
@@ -235,12 +235,12 @@
             }
 
             $.ajax({
-                url: gsSheetManagerData.ajaxUrl,
+                url: ndrDatalistData.ajaxUrl,
                 method: 'POST',
                 dataType: 'json',
                 data: {
-                    action: 'gs_sheet_manager_fetch_schema',
-                    security: gsSheetManagerData.nonce,
+                    action: 'ndr_datalist_fetch_schema',
+                    security: ndrDatalistData.nonce,
                     source_type: sourceType,
                     sheet_url: sheetUrl,
                     uploaded_file_url: uploadedUrl,
@@ -256,16 +256,16 @@
             });
         });
 
-        $(document).on('change', '.gs-sheet-manager-key, .gs-sheet-manager-active', function () {
+        $(document).on('change', '.ndr-datalist-key, .ndr-datalist-active', function () {
             syncHiddenField();
         });
 
-        $(document).on('click', '#gs-sheet-manager-sync-button', function () {
+        $(document).on('click', '#ndr-datalist-sync-button', function () {
             var postId = $(this).data('post-id');
             submitSyncForm(postId);
         });
 
-        $(document).on('click', '.gs-sheet-manager-delete-version', function () {
+        $(document).on('click', '.ndr-datalist-delete-version', function () {
             if (!confirm('Bu dosyayı silmek istediğinize emin misiniz?')) {
                 return;
             }
@@ -273,7 +273,7 @@
             var fileName = $(this).data('file-name');
             submitDeleteVersionForm(postId, fileName);
         });
-        $(document).on('click', '.gs-sheet-manager-activate-version', function () {
+        $(document).on('click', '.ndr-datalist-activate-version', function () {
             var version = $(this).data('version');
             if (!confirm('v' + version + ' versiyonunu tekrar yayına almak istediğinize emin misiniz? REST API ve kısa kod bu veriyi sunmaya başlayacaktır.')) {
                 return;
@@ -282,22 +282,22 @@
             var fileName = $(this).data('file-name');
             submitActivateVersionForm(postId, fileName);
         });
-        $(document).on('change', '#gs-sheet-manager-select-all', function () {
+        $(document).on('change', '#ndr-datalist-select-all', function () {
             var checked = $(this).is(':checked');
-            $('.gs-sheet-manager-version-cb:not(:disabled)').prop('checked', checked);
+            $('.ndr-datalist-version-cb:not(:disabled)').prop('checked', checked);
             updateBulkDeleteState();
         });
 
-        $(document).on('change', '.gs-sheet-manager-version-cb', function () {
-            var total = $('.gs-sheet-manager-version-cb:not(:disabled)').length;
-            var checked = $('.gs-sheet-manager-version-cb:checked').length;
-            $('#gs-sheet-manager-select-all').prop('checked', total > 0 && total === checked);
+        $(document).on('change', '.ndr-datalist-version-cb', function () {
+            var total = $('.ndr-datalist-version-cb:not(:disabled)').length;
+            var checked = $('.ndr-datalist-version-cb:checked').length;
+            $('#ndr-datalist-select-all').prop('checked', total > 0 && total === checked);
             updateBulkDeleteState();
         });
 
-        $(document).on('click', '#gs-sheet-manager-bulk-delete-btn', function () {
+        $(document).on('click', '#ndr-datalist-bulk-delete-btn', function () {
             var fileNames = [];
-            $('.gs-sheet-manager-version-cb:checked').each(function () {
+            $('.ndr-datalist-version-cb:checked').each(function () {
                 fileNames.push($(this).val());
             });
             if (!fileNames.length) {

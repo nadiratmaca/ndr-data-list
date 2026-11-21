@@ -4,7 +4,7 @@ WordPress için **Veri Kaynakları + Listeler + Ortak Şablonlar** üçlü mimar
 
 ## Özellikler
 
-- **Veri Kaynakları (`gs_sheet_manager`):**
+- **Veri Kaynakları (`ndr_datalist_source`):**
   - Google Sheet URL, JSON / REST API URL, CSV URL, XML URL ve Dosya Yükleme (JSON / CSV / XML) desteği.
   - Şema çözümleme, alan seçimi/yeniden adlandırma, tarih damgalı versiyonlama, tek tıkla eski versiyonu yayına alma (rollback), toplu silme ve yüksek hızlı statik `data.json` üretimi.
 - **Listeler (`ndr_api_source`):**
@@ -24,6 +24,6 @@ WordPress için **Veri Kaynakları + Listeler + Ortak Şablonlar** üçlü mimar
 ## Kısa Kodlar
 
 - `[ndr_api_renderer id="LISTE_ID"]` (isteğe bağlı `filter="alan=deger"` parametresi ile)
-- `[google_sheet id="VERI_KAYNAGI_ID"]`
+- `[ndr_datalist_sheet id="VERI_KAYNAGI_ID"]`
 - **Dosya Yöneticisi (`ndr-file-manager`):**
   - WordPress Medya Kütüphanesinden bağımsız, Ayarlar'dan belirlenen kök dizinde dosya yükleme, silme, yeniden adlandırma, inline düzenleme, toplu ZIP paketleme ve ZIP arşiv açma.

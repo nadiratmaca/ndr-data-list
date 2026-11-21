@@ -97,7 +97,8 @@ class NDR_API_Frontend_Renderer
 
     public static function get_ui_strings()
     {
-        $locale = function_exists('get_locale') ? get_locale() : 'tr_TR';
+        $wplang = get_option('WPLANG');
+        $locale = ($wplang === '') ? 'en_US' : ($wplang ?: (function_exists('get_locale') ? get_locale() : 'en_US'));
         if (strpos($locale, 'en') === 0) {
             return array(
                 'search'        => 'Search',

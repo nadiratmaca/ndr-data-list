@@ -6,12 +6,12 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-if (! class_exists('GS_Sheet_Manager')) {
+if (! class_exists('NDR_Data_Source_Manager')) {
 
     /**
-     * GS Sheet Manager main plugin class.
+     * NDR DataList main plugin class.
      */
-    class GS_Sheet_Manager
+    class NDR_Data_Source_Manager
     {
 
         /**
@@ -20,18 +20,18 @@ if (! class_exists('GS_Sheet_Manager')) {
         public function __construct()
         {
             add_action('init', array($this, 'register_post_type'));
-            add_filter('manage_gs_sheet_manager_posts_columns', array($this, 'add_ds_columns'));
-            add_action('manage_gs_sheet_manager_posts_custom_column', array($this, 'render_ds_columns'), 10, 2);
+            add_filter('manage_ndr_datalist_source_posts_columns', array($this, 'add_ds_columns'));
+            add_action('manage_ndr_datalist_source_posts_custom_column', array($this, 'render_ds_columns'), 10, 2);
             add_action('add_meta_boxes', array($this, 'register_meta_box'));
             add_action('save_post', array($this, 'save_meta_box'), 10, 2);
             add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
-            add_action('wp_ajax_gs_sheet_manager_fetch_schema', array($this, 'ajax_fetch_schema'));
-            add_action('admin_post_gs_sheet_manager_sync', array($this, 'handle_sync_action'));
-            add_action('admin_post_gs_sheet_manager_delete_version', array($this, 'handle_delete_version_action'));
-            add_action('admin_post_gs_sheet_manager_activate_version', array($this, 'handle_activate_version_action'));
-            add_action('admin_post_gs_sheet_manager_bulk_delete_versions', array($this, 'handle_bulk_delete_versions_action'));
+            add_action('wp_ajax_ndr_datalist_fetch_schema', array($this, 'ajax_fetch_schema'));
+            add_action('admin_post_ndr_datalist_sync', array($this, 'handle_sync_action'));
+            add_action('admin_post_ndr_datalist_delete_version', array($this, 'handle_delete_version_action'));
+            add_action('admin_post_ndr_datalist_activate_version', array($this, 'handle_activate_version_action'));
+            add_action('admin_post_ndr_datalist_bulk_delete_versions', array($this, 'handle_bulk_delete_versions_action'));
             add_action('rest_api_init', array($this, 'register_rest_routes'));
-            add_shortcode('google_sheet', array($this, 'render_sheet_shortcode'));
+            add_shortcode('ndr_datalist_sheet', array($this, 'render_sheet_shortcode'));
             add_action('admin_notices', array($this, 'admin_notices'));
             add_action('before_delete_post', array($this, 'handle_post_deletion'));
         }
@@ -42,17 +42,17 @@ if (! class_exists('GS_Sheet_Manager')) {
         public function register_post_type()
         {
             $labels = array(
-                'name'                  => __('Veri Kaynakları', 'gs-sheet-manager'),
-                'singular_name'         => __('Veri Kaynağı', 'gs-sheet-manager'),
-                'menu_name'             => __('Veri Kaynakları', 'gs-sheet-manager'),
-                'add_new'               => __('Veri Kaynağı Ekle', 'gs-sheet-manager'),
-                'add_new_item'          => __('Veri Kaynağı Ekle', 'gs-sheet-manager'),
-                'edit_item'             => __('Veri Kaynağını Düzenle', 'gs-sheet-manager'),
-                'new_item'              => __('Yeni Veri Kaynağı', 'gs-sheet-manager'),
-                'view_item'             => __('Veri Kaynağını Görüntüle', 'gs-sheet-manager'),
-                'search_items'          => __('Veri Kaynağı Ara', 'gs-sheet-manager'),
-                'not_found'             => __('Veri kaynağı bulunamadı.', 'gs-sheet-manager'),
-                'not_found_in_trash'    => __('Çöp kutusunda veri kaynağı bulunamadı.', 'gs-sheet-manager'),
+                'name'                  => __('Veri Kaynakları', 'ndr-rest-api-to-render'),
+                'singular_name'         => __('Veri Kaynağı', 'ndr-rest-api-to-render'),
+                'menu_name'             => __('Veri Kaynakları', 'ndr-rest-api-to-render'),
+                'add_new'               => __('Veri Kaynağı Ekle', 'ndr-rest-api-to-render'),
+                'add_new_item'          => __('Veri Kaynağı Ekle', 'ndr-rest-api-to-render'),
+                'edit_item'             => __('Veri Kaynağını Düzenle', 'ndr-rest-api-to-render'),
+                'new_item'              => __('Yeni Veri Kaynağı', 'ndr-rest-api-to-render'),
+                'view_item'             => __('Veri Kaynağını Görüntüle', 'ndr-rest-api-to-render'),
+                'search_items'          => __('Veri Kaynağı Ara', 'ndr-rest-api-to-render'),
+                'not_found'             => __('Veri kaynağı bulunamadı.', 'ndr-rest-api-to-render'),
+                'not_found_in_trash'    => __('Çöp kutusunda veri kaynağı bulunamadı.', 'ndr-rest-api-to-render'),
             );
 
             $args = array(
@@ -69,7 +69,7 @@ if (! class_exists('GS_Sheet_Manager')) {
                 'menu_icon'           => 'dashicons-media-spreadsheet',
             );
 
-            register_post_type('gs_sheet_manager', $args);
+            register_post_type('ndr_datalist_source', $args);
         }
 
         /**
@@ -82,8 +82,8 @@ if (! class_exists('GS_Sheet_Manager')) {
             foreach ($columns as $k => $v) {
                 $new[$k] = $v;
                 if ('title' === $k) {
-                    $new['ds_type']  = __('Kaynak Tipi', 'gs-sheet-manager');
-                    $new['ds_stats'] = __('Kayıt / Versiyon', 'gs-sheet-manager');
+                    $new['ds_type']  = __('Kaynak Tipi', 'ndr-rest-api-to-render');
+                    $new['ds_stats'] = __('Kayıt / Versiyon', 'ndr-rest-api-to-render');
                 }
             }
             return $new;
@@ -92,18 +92,18 @@ if (! class_exists('GS_Sheet_Manager')) {
         public function render_ds_columns($column, $post_id)
         {
             if ('ds_type' === $column) {
-                $t = get_post_meta($post_id, '_gs_source_type', true) ?: 'google_sheet';
+                $t = get_post_meta($post_id, '_ndr_datalist_source_type', true) ?: 'google_sheet';
                 $map = array('google_sheet' => 'Google Sheet', 'json' => 'JSON / REST', 'csv' => 'CSV URL', 'xml' => 'XML URL', 'upload' => 'Dosya');
                 echo esc_html($map[$t] ?? $t);
             } elseif ('ds_stats' === $column) {
                 $ud = wp_upload_dir();
-                $lf = trailingslashit($ud['basedir']) . 'gs-api-storage/' . absint($post_id) . '/data.json';
+                $lf = trailingslashit($ud['basedir']) . 'ndr-datalist-api-storage/' . absint($post_id) . '/data.json';
                 $cnt = 0;
                 if (file_exists($lf)) {
                     $dec = json_decode((string) file_get_contents($lf), true);
                     if (is_array($dec)) $cnt = count($dec);
                 }
-                $ver = get_post_meta($post_id, '_gs_active_version', true) ?: get_post_meta($post_id, '_gs_current_version', true);
+                $ver = get_post_meta($post_id, '_ndr_datalist_active_version', true) ?: get_post_meta($post_id, '_ndr_datalist_current_version', true);
                 echo '<strong>' . esc_html($cnt) . ' kayıt</strong>';
                 if ($ver) {
                     echo ' <span class="description">(v' . esc_html($ver) . ')</span>';
@@ -114,10 +114,10 @@ if (! class_exists('GS_Sheet_Manager')) {
         public function register_meta_box()
         {
             add_meta_box(
-                'gs_sheet_manager_meta',
-                __('GS Sheet Ayarları', 'gs-sheet-manager'),
+                'ndr_datalist_meta',
+                __('GS Sheet Ayarları', 'ndr-rest-api-to-render'),
                 array($this, 'render_meta_box'),
-                'gs_sheet_manager',
+                'ndr_datalist_source',
                 'normal',
                 'high'
             );
@@ -133,29 +133,29 @@ if (! class_exists('GS_Sheet_Manager')) {
             }
 
             $screen = get_current_screen();
-            if (! $screen || 'gs_sheet_manager' !== $screen->post_type) {
+            if (! $screen || 'ndr_datalist_source' !== $screen->post_type) {
                 return;
             }
 
             wp_enqueue_media();
             wp_enqueue_script(
-                'gs-sheet-manager-admin',
+                'ndr-datalist-admin',
                 plugins_url('ds-admin.js', __FILE__),
                 array('jquery'),
-                '1.0.3',
+                (string) filemtime(plugin_dir_path(__FILE__) . 'ds-admin.js'),
                 true
             );
 
             wp_localize_script(
-                'gs-sheet-manager-admin',
-                'gsSheetManagerData',
+                'ndr-datalist-admin',
+                'ndrDatalistData',
                 array(
                     'ajaxUrl'      => admin_url('admin-ajax.php'),
-                    'nonce'        => wp_create_nonce('gs_sheet_manager_schema'),
-                    'syncNonce'    => wp_create_nonce('gs_sheet_manager_sync'),
-                    'deleteNonce'   => wp_create_nonce('gs_sheet_manager_delete'),
-                    'activateNonce'   => wp_create_nonce('gs_sheet_manager_activate'),
-                    'bulkDeleteNonce' => wp_create_nonce('gs_sheet_manager_bulk_delete'),
+                    'nonce'        => wp_create_nonce('ndr_datalist_schema'),
+                    'syncNonce'    => wp_create_nonce('ndr_datalist_sync'),
+                    'deleteNonce'   => wp_create_nonce('ndr_datalist_delete'),
+                    'activateNonce'   => wp_create_nonce('ndr_datalist_activate'),
+                    'bulkDeleteNonce' => wp_create_nonce('ndr_datalist_bulk_delete'),
                 )
             );
         }
@@ -165,66 +165,66 @@ if (! class_exists('GS_Sheet_Manager')) {
          */
         public function render_meta_box($post)
         {
-            $source_type       = get_post_meta($post->ID, '_gs_source_type', true) ?: 'google_sheet';
-            $sheet_url         = get_post_meta($post->ID, '_gs_sheet_url', true);
-            $uploaded_file_url = get_post_meta($post->ID, '_gs_uploaded_file_url', true);
-            $uploaded_file_id  = absint(get_post_meta($post->ID, '_gs_uploaded_file_id', true));
-            $mapping_rules     = get_post_meta($post->ID, '_gs_mapping_rules', true);
+            $source_type       = get_post_meta($post->ID, '_ndr_datalist_source_type', true) ?: 'google_sheet';
+            $sheet_url         = get_post_meta($post->ID, '_ndr_datalist_sheet_url', true);
+            $uploaded_file_url = get_post_meta($post->ID, '_ndr_datalist_uploaded_file_url', true);
+            $uploaded_file_id  = absint(get_post_meta($post->ID, '_ndr_datalist_uploaded_file_id', true));
+            $mapping_rules     = get_post_meta($post->ID, '_ndr_datalist_mapping_rules', true);
             $mapping_rules     = ! empty($mapping_rules) ? json_decode($mapping_rules, true) : array();
-            $current_ver       = get_post_meta($post->ID, '_gs_current_version', true);
-            $post_nonce        = wp_nonce_field('gs_sheet_manager_meta', 'gs_sheet_manager_meta_nonce', true, false);
+            $current_ver       = get_post_meta($post->ID, '_ndr_datalist_current_version', true);
+            $post_nonce        = wp_nonce_field('ndr_datalist_meta', 'ndr_datalist_meta_nonce', true, false);
             $version_files     = $this->get_version_files($post->ID);
 ?>
-            <div class="gs-sheet-manager-meta">
+            <div class="ndr-datalist-meta">
                 <p>
-                    <label for="gs_source_type"><strong><?php esc_html_e('Veri Kaynağı Tipi', 'gs-sheet-manager'); ?></strong></label><br />
-                    <select id="gs_source_type" name="gs_source_type" class="widefat">
-                        <option value="google_sheet" <?php selected($source_type, 'google_sheet'); ?>><?php esc_html_e('Google Sheet URL', 'gs-sheet-manager'); ?></option>
-                        <option value="json" <?php selected($source_type, 'json'); ?>><?php esc_html_e('JSON / REST API URL', 'gs-sheet-manager'); ?></option>
-                        <option value="csv" <?php selected($source_type, 'csv'); ?>><?php esc_html_e('CSV Dosya URL', 'gs-sheet-manager'); ?></option>
-                        <option value="xml" <?php selected($source_type, 'xml'); ?>><?php esc_html_e('XML Dosya URL', 'gs-sheet-manager'); ?></option>
-                        <option value="upload" <?php selected($source_type, 'upload'); ?>><?php esc_html_e('Dosya Yükleme (JSON / CSV / XML)', 'gs-sheet-manager'); ?></option>
+                    <label for="ndr_datalist_source_type"><strong><?php esc_html_e('Veri Kaynağı Tipi', 'ndr-rest-api-to-render'); ?></strong></label><br />
+                    <select id="ndr_datalist_source_type" name="ndr_datalist_source_type" class="widefat">
+                        <option value="google_sheet" <?php selected($source_type, 'google_sheet'); ?>><?php esc_html_e('Google Sheet URL', 'ndr-rest-api-to-render'); ?></option>
+                        <option value="json" <?php selected($source_type, 'json'); ?>><?php esc_html_e('JSON / REST API URL', 'ndr-rest-api-to-render'); ?></option>
+                        <option value="csv" <?php selected($source_type, 'csv'); ?>><?php esc_html_e('CSV Dosya URL', 'ndr-rest-api-to-render'); ?></option>
+                        <option value="xml" <?php selected($source_type, 'xml'); ?>><?php esc_html_e('XML Dosya URL', 'ndr-rest-api-to-render'); ?></option>
+                        <option value="upload" <?php selected($source_type, 'upload'); ?>><?php esc_html_e('Dosya Yükleme (JSON / CSV / XML)', 'ndr-rest-api-to-render'); ?></option>
                     </select>
                 </p>
-                <p id="gs-url-input-wrap" style="<?php echo ($source_type === 'upload') ? 'display:none;' : ''; ?>">
-                    <label for="gs_sheet_manager_sheet_url"><strong><?php esc_html_e('Kaynak URL (Google Sheet / JSON / CSV / XML)', 'gs-sheet-manager'); ?></strong></label><br />
-                    <input type="url" id="gs_sheet_manager_sheet_url" name="gs_sheet_manager_sheet_url" value="<?php echo esc_attr($sheet_url); ?>" class="widefat" placeholder="https://..." />
+                <p id="ndr-datalist-url-input-wrap" style="<?php echo ($source_type === 'upload') ? 'display:none;' : ''; ?>">
+                    <label for="ndr_datalist_sheet_url"><strong><?php esc_html_e('Kaynak URL (Google Sheet / JSON / CSV / XML)', 'ndr-rest-api-to-render'); ?></strong></label><br />
+                    <input type="url" id="ndr_datalist_sheet_url" name="ndr_datalist_sheet_url" value="<?php echo esc_attr($sheet_url); ?>" class="widefat" placeholder="https://..." />
                 </p>
-                <p id="gs-upload-input-wrap" style="<?php echo ($source_type === 'upload') ? '' : 'display:none;'; ?>">
-                    <label for="gs_uploaded_file_url"><strong><?php esc_html_e('Yüklü Dosya URL (JSON / CSV / XML)', 'gs-sheet-manager'); ?></strong></label><br />
+                <p id="ndr-datalist-upload-input-wrap" style="<?php echo ($source_type === 'upload') ? '' : 'display:none;'; ?>">
+                    <label for="ndr_datalist_uploaded_file_url"><strong><?php esc_html_e('Yüklü Dosya URL (JSON / CSV / XML)', 'ndr-rest-api-to-render'); ?></strong></label><br />
                     <span style="display:flex;gap:8px;align-items:center;">
-                        <input type="url" id="gs_uploaded_file_url" name="gs_uploaded_file_url" value="<?php echo esc_attr($uploaded_file_url); ?>" class="widefat" placeholder="https://.../dosya.json" />
-                        <input type="hidden" id="gs_uploaded_file_id" name="gs_uploaded_file_id" value="<?php echo esc_attr($uploaded_file_id); ?>" />
-                        <button type="button" class="button button-secondary" id="gs-upload-media-btn" style="white-space:nowrap;"><?php esc_html_e('Dosya Seç / Yükle', 'gs-sheet-manager'); ?></button>
+                        <input type="url" id="ndr_datalist_uploaded_file_url" name="ndr_datalist_uploaded_file_url" value="<?php echo esc_attr($uploaded_file_url); ?>" class="widefat" placeholder="https://.../dosya.json" />
+                        <input type="hidden" id="ndr_datalist_uploaded_file_id" name="ndr_datalist_uploaded_file_id" value="<?php echo esc_attr($uploaded_file_id); ?>" />
+                        <button type="button" class="button button-secondary" id="ndr-datalist-upload-media-btn" style="white-space:nowrap;"><?php esc_html_e('Dosya Seç / Yükle', 'ndr-rest-api-to-render'); ?></button>
                     </span>
                 </p>
                 <p>
-                    <button type="button" class="button button-primary" id="gs-sheet-manager-analyze-button">
-                        <?php esc_html_e('Şemayı Çözümle', 'gs-sheet-manager'); ?>
+                    <button type="button" class="button button-primary" id="ndr-datalist-analyze-button">
+                        <?php esc_html_e('Şemayı Çözümle', 'ndr-rest-api-to-render'); ?>
                     </button>
                 </p>
-                <div id="gs-sheet-manager-schema-container">
+                <div id="ndr-datalist-schema-container">
                     <?php if (! empty($mapping_rules)) : ?>
                         <?php $this->render_mapping_rows($mapping_rules); ?>
                     <?php else : ?>
-                        <p><?php esc_html_e('URL girdikten sonra Şemayı Çözümle butonuna basın.', 'gs-sheet-manager'); ?></p>
+                        <p><?php esc_html_e('URL girdikten sonra Şemayı Çözümle butonuna basın.', 'ndr-rest-api-to-render'); ?></p>
                     <?php endif; ?>
                 </div>
-                <input type="hidden" name="gs_sheet_manager_mapping_rules" id="gs_sheet_manager_mapping_rules" value="<?php echo esc_attr(wp_json_encode($mapping_rules)); ?>" />
+                <input type="hidden" name="ndr_datalist_mapping_rules" id="ndr_datalist_mapping_rules" value="<?php echo esc_attr(wp_json_encode($mapping_rules)); ?>" />
                 <p>
-                    <button type="button" class="button button-secondary" id="gs-sheet-manager-sync-button" data-post-id="<?php echo esc_attr($post->ID); ?>">
-                        <?php esc_html_e('Şimdi Senkronize Et', 'gs-sheet-manager'); ?>
+                    <button type="button" class="button button-secondary" id="ndr-datalist-sync-button" data-post-id="<?php echo esc_attr($post->ID); ?>">
+                        <?php esc_html_e('Şimdi Senkronize Et', 'ndr-rest-api-to-render'); ?>
                     </button>
                 </p>
                 <?php
-                $active_ver = get_post_meta($post->ID, '_gs_active_version', true);
+                $active_ver = get_post_meta($post->ID, '_ndr_datalist_active_version', true);
                 if (empty($active_ver) && ! empty($current_ver)) {
                     $active_ver = $current_ver;
                 }
                 $active_ver_num = absint($active_ver);
-                $rest_url        = esc_url(rest_url('gs-api/v1/data/' . $post->ID));
+                $rest_url        = esc_url(rest_url('ndr-datalist/v1/data/' . $post->ID));
                 $upload_dir      = wp_upload_dir();
-                $static_json_url = esc_url(trailingslashit($upload_dir['baseurl']) . 'gs-api-storage/' . absint($post->ID) . '/data.json');
+                $static_json_url = esc_url(trailingslashit($upload_dir['baseurl']) . 'ndr-datalist-api-storage/' . absint($post->ID) . '/data.json');
                 $active_info     = null;
                 foreach ($version_files as $vf) {
                     if ($vf['number'] === $active_ver_num) {
@@ -233,66 +233,66 @@ if (! class_exists('GS_Sheet_Manager')) {
                     }
                 }
                 ?>
-                <div class="gs-version-status-card">
-                    <div class="gs-version-status-header">
+                <div class="ndr-datalist-version-status-card">
+                    <div class="ndr-datalist-version-status-header">
                         <div>
-                            <span class="gs-version-status-label"><?php esc_html_e('Yayındaki Aktif Versiyon', 'gs-sheet-manager'); ?></span>
+                            <span class="ndr-datalist-version-status-label"><?php esc_html_e('Yayındaki Aktif Versiyon', 'ndr-rest-api-to-render'); ?></span>
                             <?php if ($active_ver_num > 0) : ?>
-                                <span class="gs-version-badge gs-version-badge-live">
-                                    <span class="gs-version-dot"></span>
+                                <span class="ndr-datalist-version-badge ndr-datalist-version-badge-live">
+                                    <span class="ndr-datalist-version-dot"></span>
                                     <?php echo esc_html(sprintf('v%d — YAYINDA', $active_ver_num)); ?>
                                 </span>
                                 <?php if ($active_info) : ?>
-                                    <span class="gs-version-status-meta">
+                                    <span class="ndr-datalist-version-status-meta">
                                         <?php echo esc_html(date_i18n('d.m.Y H:i:s', $active_info['time'])); ?>
                                         &bull;
-                                        <?php echo esc_html(sprintf(__('%d kayıt', 'gs-sheet-manager'), $active_info['rows'])); ?>
+                                        <?php echo esc_html(sprintf(__('%d kayıt', 'ndr-rest-api-to-render'), $active_info['rows'])); ?>
                                         &bull;
                                         <?php echo esc_html(size_format($active_info['size'])); ?>
                                     </span>
                                 <?php endif; ?>
                             <?php else : ?>
-                                <span class="gs-version-badge gs-version-badge-none"><?php esc_html_e('Henüz yayınlanmış versiyon yok', 'gs-sheet-manager'); ?></span>
+                                <span class="ndr-datalist-version-badge ndr-datalist-version-badge-none"><?php esc_html_e('Henüz yayınlanmış versiyon yok', 'ndr-rest-api-to-render'); ?></span>
                             <?php endif; ?>
                         </div>
-                        <div class="gs-version-api-box" style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+                        <div class="ndr-datalist-version-api-box" style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
                             <div>
-                                <strong><?php esc_html_e('Statik JSON (Hızlı):', 'gs-sheet-manager'); ?></strong>
+                                <strong><?php esc_html_e('Statik JSON (Hızlı):', 'ndr-rest-api-to-render'); ?></strong>
                                 <a href="<?php echo $static_json_url; ?>" target="_blank" rel="noopener noreferrer"><code><?php echo $static_json_url; ?></code></a>
                             </div>
                             <div>
-                                <strong><?php esc_html_e('REST API:', 'gs-sheet-manager'); ?></strong>
+                                <strong><?php esc_html_e('REST API:', 'ndr-rest-api-to-render'); ?></strong>
                                 <a href="<?php echo $rest_url; ?>" target="_blank" rel="noopener noreferrer"><code><?php echo $rest_url; ?></code></a>
-                                <span class="description"><?php esc_html_e('(Belirli versiyon için ?version=N)', 'gs-sheet-manager'); ?></span>
+                                <span class="description"><?php esc_html_e('(Belirli versiyon için ?version=N)', 'ndr-rest-api-to-render'); ?></span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <h4><?php esc_html_e('Versiyon Geçmişi', 'gs-sheet-manager'); ?></h4>
+                <h4><?php esc_html_e('Versiyon Geçmişi', 'ndr-rest-api-to-render'); ?></h4>
                 <?php $this->render_version_table($post->ID, $version_files, $active_ver_num); ?>
                 <?php echo $post_nonce; ?>
             </div>
             <style>
-                .gs-sheet-manager-table {
+                .ndr-datalist-table {
                     width: 100%;
                     border-collapse: collapse;
                     margin-top: 0.75rem;
                     background: #fff;
                 }
-                .gs-sheet-manager-table th,
-                .gs-sheet-manager-table td {
+                .ndr-datalist-table th,
+                .ndr-datalist-table td {
                     border: 1px solid #dcdcde;
                     padding: 10px 12px;
                     vertical-align: middle;
                     text-align: left;
                 }
-                .gs-sheet-manager-table th {
+                .ndr-datalist-table th {
                     background: #f6f7f7;
                     font-weight: 600;
                     color: #1d2327;
                 }
-                .gs-version-status-card {
+                .ndr-datalist-version-status-card {
                     margin: 16px 0 12px;
                     padding: 14px 16px;
                     background: #f0f9f2;
@@ -300,28 +300,28 @@ if (! class_exists('GS_Sheet_Manager')) {
                     border-left: 4px solid #00a32a;
                     border-radius: 4px;
                 }
-                .gs-version-status-header {
+                .ndr-datalist-version-status-header {
                     display: flex;
                     flex-wrap: wrap;
                     justify-content: space-between;
                     align-items: center;
                     gap: 10px;
                 }
-                .gs-version-status-label {
+                .ndr-datalist-version-status-label {
                     font-weight: 600;
                     color: #1d2327;
                     margin-right: 8px;
                 }
-                .gs-version-status-meta {
+                .ndr-datalist-version-status-meta {
                     color: #50575e;
                     font-size: 12.5px;
                     margin-left: 8px;
                 }
-                .gs-version-api-box {
+                .ndr-datalist-version-api-box {
                     font-size: 12.5px;
                     color: #3c434a;
                 }
-                .gs-version-badge {
+                .ndr-datalist-version-badge {
                     display: inline-flex;
                     align-items: center;
                     gap: 6px;
@@ -331,39 +331,39 @@ if (! class_exists('GS_Sheet_Manager')) {
                     font-weight: 600;
                     line-height: 1.4;
                 }
-                .gs-version-badge-live {
+                .ndr-datalist-version-badge-live {
                     background: #00a32a;
                     color: #fff;
                 }
-                .gs-version-badge-ver {
+                .ndr-datalist-version-badge-ver {
                     background: #f0f0f1;
                     color: #2c3338;
                     border: 1px solid #c3c4c7;
                 }
-                .gs-version-badge-none {
+                .ndr-datalist-version-badge-none {
                     background: #dba617;
                     color: #fff;
                 }
-                .gs-version-dot {
+                .ndr-datalist-version-dot {
                     width: 7px;
                     height: 7px;
                     border-radius: 50%;
                     background: #fff;
                     display: inline-block;
                 }
-                .gs-version-row-active {
+                .ndr-datalist-version-row-active {
                     background: #f2fbf4 !important;
                 }
-                .gs-version-row-active td:first-child {
+                .ndr-datalist-version-row-active td:first-child {
                     border-left: 4px solid #00a32a;
                 }
-                .gs-version-actions {
+                .ndr-datalist-version-actions {
                     display: flex;
                     align-items: center;
                     gap: 6px;
                     flex-wrap: wrap;
                 }
-                .gs-version-active-note {
+                .ndr-datalist-version-active-note {
                     color: #008a20;
                     font-size: 12px;
                     font-weight: 500;
@@ -381,25 +381,25 @@ if (! class_exists('GS_Sheet_Manager')) {
         private function render_mapping_rows($mapping_rules)
         {
         ?>
-            <table class="gs-sheet-manager-table">
+            <table class="ndr-datalist-table">
                 <thead>
                     <tr>
-                        <th><?php esc_html_e('Aktif', 'gs-sheet-manager'); ?></th>
-                        <th><?php esc_html_e('Sütun Başlığı', 'gs-sheet-manager'); ?></th>
-                        <th><?php esc_html_e('Değişken Adı', 'gs-sheet-manager'); ?></th>
+                        <th><?php esc_html_e('Aktif', 'ndr-rest-api-to-render'); ?></th>
+                        <th><?php esc_html_e('Sütun Başlığı', 'ndr-rest-api-to-render'); ?></th>
+                        <th><?php esc_html_e('Değişken Adı', 'ndr-rest-api-to-render'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($mapping_rules as $index => $rule) : ?>
                         <tr>
                             <td style="text-align:center;">
-                                <input type="checkbox" class="gs-sheet-manager-active" value="1" <?php checked(isset($rule['active']) && $rule['active'], true); ?> />
+                                <input type="checkbox" class="ndr-datalist-active" value="1" <?php checked(isset($rule['active']) && $rule['active'], true); ?> />
                             </td>
                             <td>
-                                <input type="text" class="widefat gs-sheet-manager-header" value="<?php echo esc_attr($rule['header']); ?>" readonly />
+                                <input type="text" class="widefat ndr-datalist-header" value="<?php echo esc_attr($rule['header']); ?>" readonly />
                             </td>
                             <td>
-                                <input type="text" class="widefat gs-sheet-manager-key" value="<?php echo esc_attr($rule['key']); ?>" />
+                                <input type="text" class="widefat ndr-datalist-key" value="<?php echo esc_attr($rule['key']); ?>" />
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -417,64 +417,64 @@ if (! class_exists('GS_Sheet_Manager')) {
         private function render_version_table($post_id, $version_files, $active_version = 0)
         {
             if (empty($version_files)) {
-                echo '<p>' . esc_html__('Henüz versiyon dosyası yok.', 'gs-sheet-manager') . '</p>';
+                echo '<p>' . esc_html__('Henüz versiyon dosyası yok.', 'ndr-rest-api-to-render') . '</p>';
                 return;
             }
 
-            echo '<div class="gs-version-toolbar" style="display:flex; justify-content:space-between; align-items:center; margin:10px 0 6px; gap:10px; flex-wrap:wrap;">';
+            echo '<div class="ndr-datalist-version-toolbar" style="display:flex; justify-content:space-between; align-items:center; margin:10px 0 6px; gap:10px; flex-wrap:wrap;">';
             echo '<div style="display:flex; align-items:center; gap:8px;">';
-            echo '<button type="button" class="button button-secondary" id="gs-sheet-manager-bulk-delete-btn" data-post-id="' . esc_attr($post_id) . '" disabled>' . esc_html__('Seçilenleri Sil', 'gs-sheet-manager') . '</button>';
-            echo '<span class="description">' . esc_html__('Yayındaki aktif versiyon toplu silme işlemine dahil edilmez.', 'gs-sheet-manager') . '</span>';
+            echo '<button type="button" class="button button-secondary" id="ndr-datalist-bulk-delete-btn" data-post-id="' . esc_attr($post_id) . '" disabled>' . esc_html__('Seçilenleri Sil', 'ndr-rest-api-to-render') . '</button>';
+            echo '<span class="description">' . esc_html__('Yayındaki aktif versiyon toplu silme işlemine dahil edilmez.', 'ndr-rest-api-to-render') . '</span>';
             echo '</div>';
-            echo '<span class="description"><strong>' . esc_html(sprintf(__('Toplam %d versiyon', 'gs-sheet-manager'), count($version_files))) . '</strong></span>';
+            echo '<span class="description"><strong>' . esc_html(sprintf(__('Toplam %d versiyon', 'ndr-rest-api-to-render'), count($version_files))) . '</strong></span>';
             echo '</div>';
 
-            echo '<table class="gs-sheet-manager-table">';
+            echo '<table class="ndr-datalist-table">';
             echo '<thead><tr>';
-            echo '<th style="width:32px; text-align:center;"><input type="checkbox" id="gs-sheet-manager-select-all" title="' . esc_attr__('Tümünü Seç', 'gs-sheet-manager') . '" /></th>';
-            echo '<th>' . esc_html__('Versiyon / Durum', 'gs-sheet-manager') . '</th>';
-            echo '<th>' . esc_html__('Oluşturulma Tarihi', 'gs-sheet-manager') . '</th>';
-            echo '<th>' . esc_html__('Kayıt / Boyut', 'gs-sheet-manager') . '</th>';
-            echo '<th>' . esc_html__('İşlemler', 'gs-sheet-manager') . '</th>';
+            echo '<th style="width:32px; text-align:center;"><input type="checkbox" id="ndr-datalist-select-all" title="' . esc_attr__('Tümünü Seç', 'ndr-rest-api-to-render') . '" /></th>';
+            echo '<th>' . esc_html__('Versiyon / Durum', 'ndr-rest-api-to-render') . '</th>';
+            echo '<th>' . esc_html__('Oluşturulma Tarihi', 'ndr-rest-api-to-render') . '</th>';
+            echo '<th>' . esc_html__('Kayıt / Boyut', 'ndr-rest-api-to-render') . '</th>';
+            echo '<th>' . esc_html__('İşlemler', 'ndr-rest-api-to-render') . '</th>';
             echo '</tr></thead><tbody>';
 
             $upload_dir = wp_upload_dir();
-            $base_url   = trailingslashit($upload_dir['baseurl']) . 'gs-api-storage/' . absint($post_id) . '/';
+            $base_url   = trailingslashit($upload_dir['baseurl']) . 'ndr-datalist-api-storage/' . absint($post_id) . '/';
             foreach ($version_files as $file) {
                 $file_name  = basename($file['name']);
                 $ver_num    = absint($file['number']);
                 $is_active  = ($active_version > 0 && $ver_num === $active_version);
                 $modified   = date_i18n('d.m.Y H:i:s', $file['time']);
                 $open_url   = esc_url($base_url . $file_name);
-                $row_class  = $is_active ? ' class="gs-version-row-active"' : '';
-                $rows_label = sprintf(_n('%d kayıt', '%d kayıt', $file['rows'], 'gs-sheet-manager'), $file['rows']);
+                $row_class  = $is_active ? ' class="ndr-datalist-version-row-active"' : '';
+                $rows_label = sprintf(_n('%d kayıt', '%d kayıt', $file['rows'], 'ndr-rest-api-to-render'), $file['rows']);
                 $size_label = size_format($file['size']);
 
                 echo '<tr' . $row_class . '>';
                 echo '<td style="text-align:center;">';
                 if ($is_active) {
-                    echo '<input type="checkbox" disabled title="' . esc_attr__('Yayındaki aktif versiyon silinemez', 'gs-sheet-manager') . '" />';
+                    echo '<input type="checkbox" disabled title="' . esc_attr__('Yayındaki aktif versiyon silinemez', 'ndr-rest-api-to-render') . '" />';
                 } else {
-                    echo '<input type="checkbox" class="gs-sheet-manager-version-cb" value="' . esc_attr($file_name) . '" />';
+                    echo '<input type="checkbox" class="ndr-datalist-version-cb" value="' . esc_attr($file_name) . '" />';
                 }
                 echo '</td>';
                 echo '<td>';
                 if ($is_active) {
-                    echo '<span class="gs-version-badge gs-version-badge-live"><span class="gs-version-dot"></span>' . esc_html(sprintf('v%d — YAYINDA', $ver_num)) . '</span>';
+                    echo '<span class="ndr-datalist-version-badge ndr-datalist-version-badge-live"><span class="ndr-datalist-version-dot"></span>' . esc_html(sprintf('v%d — YAYINDA', $ver_num)) . '</span>';
                 } else {
-                    echo '<span class="gs-version-badge gs-version-badge-ver">' . esc_html(sprintf('v%d', $ver_num)) . '</span>';
+                    echo '<span class="ndr-datalist-version-badge ndr-datalist-version-badge-ver">' . esc_html(sprintf('v%d', $ver_num)) . '</span>';
                 }
                 echo '<div style="margin-top:4px; font-size:11.5px; color:#646970;"><code>' . esc_html($file_name) . '</code></div>';
                 echo '</td>';
                 echo '<td>' . esc_html($modified) . '</td>';
                 echo '<td>' . esc_html($rows_label . ' • ' . $size_label) . '</td>';
-                echo '<td><div class="gs-version-actions">';
-                echo '<a class="button button-secondary" href="' . $open_url . '" target="_blank" rel="noopener noreferrer">' . esc_html__('Önizle / Aç', 'gs-sheet-manager') . '</a>';
+                echo '<td><div class="ndr-datalist-version-actions">';
+                echo '<a class="button button-secondary" href="' . $open_url . '" target="_blank" rel="noopener noreferrer">' . esc_html__('Önizle / Aç', 'ndr-rest-api-to-render') . '</a>';
                 if (! $is_active) {
-                    echo '<button type="button" class="button button-primary gs-sheet-manager-activate-version" data-post-id="' . esc_attr($post_id) . '" data-file-name="' . esc_attr($file_name) . '" data-version="' . esc_attr($ver_num) . '">' . esc_html__('Yayına Al', 'gs-sheet-manager') . '</button>';
-                    echo '<button type="button" class="button button-link-delete gs-sheet-manager-delete-version" data-post-id="' . esc_attr($post_id) . '" data-file-name="' . esc_attr($file_name) . '">' . esc_html__('Sil', 'gs-sheet-manager') . '</button>';
+                    echo '<button type="button" class="button button-primary ndr-datalist-activate-version" data-post-id="' . esc_attr($post_id) . '" data-file-name="' . esc_attr($file_name) . '" data-version="' . esc_attr($ver_num) . '">' . esc_html__('Yayına Al', 'ndr-rest-api-to-render') . '</button>';
+                    echo '<button type="button" class="button button-link-delete ndr-datalist-delete-version" data-post-id="' . esc_attr($post_id) . '" data-file-name="' . esc_attr($file_name) . '">' . esc_html__('Sil', 'ndr-rest-api-to-render') . '</button>';
                 } else {
-                    echo '<span class="gs-version-active-note">' . esc_html__('Şu an yayında', 'gs-sheet-manager') . '</span>';
+                    echo '<span class="ndr-datalist-version-active-note">' . esc_html__('Şu an yayında', 'ndr-rest-api-to-render') . '</span>';
                 }
                 echo '</div></td>';
                 echo '</tr>';
@@ -495,7 +495,7 @@ if (! class_exists('GS_Sheet_Manager')) {
                 return;
             }
 
-            if (! isset($_POST['gs_sheet_manager_meta_nonce']) || ! wp_verify_nonce(wp_unslash($_POST['gs_sheet_manager_meta_nonce']), 'gs_sheet_manager_meta')) {
+            if (! isset($_POST['ndr_datalist_meta_nonce']) || ! wp_verify_nonce(wp_unslash($_POST['ndr_datalist_meta_nonce']), 'ndr_datalist_meta')) {
                 return;
             }
 
@@ -503,28 +503,28 @@ if (! class_exists('GS_Sheet_Manager')) {
                 return;
             }
 
-            if ('gs_sheet_manager' !== $post->post_type) {
+            if ('ndr_datalist_source' !== $post->post_type) {
                 return;
             }
 
-            if (isset($_POST['gs_source_type'])) {
-                update_post_meta($post_id, '_gs_source_type', sanitize_text_field(wp_unslash($_POST['gs_source_type'])));
+            if (isset($_POST['ndr_datalist_source_type'])) {
+                update_post_meta($post_id, '_ndr_datalist_source_type', sanitize_text_field(wp_unslash($_POST['ndr_datalist_source_type'])));
             }
-            if (isset($_POST['gs_uploaded_file_url'])) {
-                update_post_meta($post_id, '_gs_uploaded_file_url', esc_url_raw(wp_unslash($_POST['gs_uploaded_file_url'])));
+            if (isset($_POST['ndr_datalist_uploaded_file_url'])) {
+                update_post_meta($post_id, '_ndr_datalist_uploaded_file_url', esc_url_raw(wp_unslash($_POST['ndr_datalist_uploaded_file_url'])));
             }
-            if (isset($_POST['gs_uploaded_file_id'])) {
-                update_post_meta($post_id, '_gs_uploaded_file_id', absint($_POST['gs_uploaded_file_id']));
+            if (isset($_POST['ndr_datalist_uploaded_file_id'])) {
+                update_post_meta($post_id, '_ndr_datalist_uploaded_file_id', absint($_POST['ndr_datalist_uploaded_file_id']));
             }
-            if (isset($_POST['gs_sheet_manager_sheet_url'])) {
-                $sheet_url = sanitize_text_field(wp_unslash($_POST['gs_sheet_manager_sheet_url']));
-                update_post_meta($post_id, '_gs_sheet_url', $sheet_url);
+            if (isset($_POST['ndr_datalist_sheet_url'])) {
+                $sheet_url = sanitize_text_field(wp_unslash($_POST['ndr_datalist_sheet_url']));
+                update_post_meta($post_id, '_ndr_datalist_sheet_url', $sheet_url);
             }
 
-            if (isset($_POST['gs_sheet_manager_mapping_rules'])) {
-                $mapping_rules = json_decode(wp_unslash($_POST['gs_sheet_manager_mapping_rules']), true);
+            if (isset($_POST['ndr_datalist_mapping_rules'])) {
+                $mapping_rules = json_decode(wp_unslash($_POST['ndr_datalist_mapping_rules']), true);
                 $mapping_rules = $this->sanitize_mapping_rules($mapping_rules);
-                update_post_meta($post_id, '_gs_mapping_rules', wp_json_encode($mapping_rules));
+                update_post_meta($post_id, '_ndr_datalist_mapping_rules', wp_json_encode($mapping_rules));
             }
         }
 
@@ -533,10 +533,10 @@ if (! class_exists('GS_Sheet_Manager')) {
          */
         public function ajax_fetch_schema()
         {
-            check_ajax_referer('gs_sheet_manager_schema', 'security');
+            check_ajax_referer('ndr_datalist_schema', 'security');
 
             if (! current_user_can('manage_options')) {
-                wp_send_json_error(__('Yetkiniz yok.', 'gs-sheet-manager'), 403);
+                wp_send_json_error(__('Yetkiniz yok.', 'ndr-rest-api-to-render'), 403);
             }
 
             $source_type  = isset($_POST['source_type']) ? sanitize_text_field(wp_unslash($_POST['source_type'])) : 'google_sheet';
@@ -553,7 +553,7 @@ if (! class_exists('GS_Sheet_Manager')) {
                 $headers = array_keys($rows[0]);
             }
             if (empty($headers)) {
-                wp_send_json_error(__('Şema başlıkları okunamadı.', 'gs-sheet-manager'));
+                wp_send_json_error(__('Şema başlıkları okunamadı.', 'ndr-rest-api-to-render'));
             }
 
             wp_send_json_success($headers);
@@ -564,40 +564,40 @@ if (! class_exists('GS_Sheet_Manager')) {
          */
         public function handle_sync_action()
         {
-            if (! isset($_POST['gs_sheet_manager_sync_nonce']) || ! wp_verify_nonce(wp_unslash($_POST['gs_sheet_manager_sync_nonce']), 'gs_sheet_manager_sync')) {
-                wp_die(esc_html__('Nonce doğrulaması başarısız.', 'gs-sheet-manager'));
+            if (! isset($_POST['ndr_datalist_sync_nonce']) || ! wp_verify_nonce(wp_unslash($_POST['ndr_datalist_sync_nonce']), 'ndr_datalist_sync')) {
+                wp_die(esc_html__('Nonce doğrulaması başarısız.', 'ndr-rest-api-to-render'));
             }
 
             if (! current_user_can('manage_options')) {
-                wp_die(esc_html__('Yetkiniz yok.', 'gs-sheet-manager'));
+                wp_die(esc_html__('Yetkiniz yok.', 'ndr-rest-api-to-render'));
             }
 
             $post_id = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0;
             if (! $post_id) {
-                wp_die(esc_html__('Geçersiz post ID.', 'gs-sheet-manager'));
+                wp_die(esc_html__('Geçersiz post ID.', 'ndr-rest-api-to-render'));
             }
 
-            $source_type = get_post_meta($post_id, '_gs_source_type', true) ?: 'google_sheet';
-            if (isset($_POST['gs_source_type'])) {
-                $source_type = sanitize_text_field(wp_unslash($_POST['gs_source_type']));
+            $source_type = get_post_meta($post_id, '_ndr_datalist_source_type', true) ?: 'google_sheet';
+            if (isset($_POST['ndr_datalist_source_type'])) {
+                $source_type = sanitize_text_field(wp_unslash($_POST['ndr_datalist_source_type']));
             }
 
-            $sheet_url = get_post_meta($post_id, '_gs_sheet_url', true);
-            if (isset($_POST['gs_sheet_manager_sheet_url'])) {
-                $sheet_url = sanitize_text_field(wp_unslash($_POST['gs_sheet_manager_sheet_url']));
+            $sheet_url = get_post_meta($post_id, '_ndr_datalist_sheet_url', true);
+            if (isset($_POST['ndr_datalist_sheet_url'])) {
+                $sheet_url = sanitize_text_field(wp_unslash($_POST['ndr_datalist_sheet_url']));
             }
 
-            $uploaded_url = get_post_meta($post_id, '_gs_uploaded_file_url', true);
-            if (isset($_POST['gs_uploaded_file_url'])) {
-                $uploaded_url = sanitize_text_field(wp_unslash($_POST['gs_uploaded_file_url']));
+            $uploaded_url = get_post_meta($post_id, '_ndr_datalist_uploaded_file_url', true);
+            if (isset($_POST['ndr_datalist_uploaded_file_url'])) {
+                $uploaded_url = sanitize_text_field(wp_unslash($_POST['ndr_datalist_uploaded_file_url']));
             }
 
-            $mapping_rules = isset($_POST['gs_sheet_manager_mapping_rules']) ? json_decode(wp_unslash($_POST['gs_sheet_manager_mapping_rules']), true) : array();
+            $mapping_rules = isset($_POST['ndr_datalist_mapping_rules']) ? json_decode(wp_unslash($_POST['ndr_datalist_mapping_rules']), true) : array();
             $mapping_rules = $this->sanitize_mapping_rules($mapping_rules);
-            update_post_meta($post_id, '_gs_source_type', $source_type);
-            update_post_meta($post_id, '_gs_mapping_rules', wp_json_encode($mapping_rules));
-            update_post_meta($post_id, '_gs_sheet_url', $sheet_url);
-            update_post_meta($post_id, '_gs_uploaded_file_url', $uploaded_url);
+            update_post_meta($post_id, '_ndr_datalist_source_type', $source_type);
+            update_post_meta($post_id, '_ndr_datalist_mapping_rules', wp_json_encode($mapping_rules));
+            update_post_meta($post_id, '_ndr_datalist_sheet_url', $sheet_url);
+            update_post_meta($post_id, '_ndr_datalist_uploaded_file_url', $uploaded_url);
 
             $target_input = ($source_type === 'upload') ? $uploaded_url : $sheet_url;
             if (empty($target_input) || empty($mapping_rules)) {
@@ -605,8 +605,8 @@ if (! class_exists('GS_Sheet_Manager')) {
                     array(
                         'post'                     => $post_id,
                         'action'                   => 'edit',
-                        'post_type'                => 'gs_sheet_manager',
-                        'gs_sheet_manager_message' => 'missing_data',
+                        'post_type'                => 'ndr_datalist_source',
+                        'ndr_datalist_message' => 'missing_data',
                     ),
                     admin_url('post.php')
                 );
@@ -619,7 +619,7 @@ if (! class_exists('GS_Sheet_Manager')) {
                 $this->redirect_with_message($post_id, 'fetch_error', $rows->get_error_message());
             }
             if (empty($rows)) {
-                $this->redirect_with_message($post_id, 'no_rows', __('Kaynak içinde veri satırı bulunamadı.', 'gs-sheet-manager'));
+                $this->redirect_with_message($post_id, 'no_rows', __('Kaynak içinde veri satırı bulunamadı.', 'ndr-rest-api-to-render'));
             }
 
             $json_array = $this->build_json_array($rows, $mapping_rules);
@@ -627,7 +627,7 @@ if (! class_exists('GS_Sheet_Manager')) {
                 $this->redirect_with_message(
                     $post_id,
                     'mapping_empty',
-                    __('Aktif eşleme alanı yok veya eşleme satırlarla uyuşmuyor.', 'gs-sheet-manager')
+                    __('Aktif eşleme alanı yok veya eşleme satırlarla uyuşmuyor.', 'ndr-rest-api-to-render')
                 );
             }
 
@@ -648,19 +648,19 @@ if (! class_exists('GS_Sheet_Manager')) {
          */
         public function handle_delete_version_action()
         {
-            if (! isset($_POST['gs_sheet_manager_delete_nonce']) || ! wp_verify_nonce(wp_unslash($_POST['gs_sheet_manager_delete_nonce']), 'gs_sheet_manager_delete')) {
-                wp_die(esc_html__('Nonce doğrulaması başarısız.', 'gs-sheet-manager'));
+            if (! isset($_POST['ndr_datalist_delete_nonce']) || ! wp_verify_nonce(wp_unslash($_POST['ndr_datalist_delete_nonce']), 'ndr_datalist_delete')) {
+                wp_die(esc_html__('Nonce doğrulaması başarısız.', 'ndr-rest-api-to-render'));
             }
 
             if (! current_user_can('manage_options')) {
-                wp_die(esc_html__('Yetkiniz yok.', 'gs-sheet-manager'));
+                wp_die(esc_html__('Yetkiniz yok.', 'ndr-rest-api-to-render'));
             }
 
             $post_id = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0;
             $file_name = isset($_POST['file_name']) ? sanitize_file_name(wp_unslash($_POST['file_name'])) : '';
 
             if (! $post_id || empty($file_name)) {
-                wp_die(esc_html__('Geçersiz parametre.', 'gs-sheet-manager'));
+                wp_die(esc_html__('Geçersiz parametre.', 'ndr-rest-api-to-render'));
             }
 
             $delete_result = $this->delete_version_file($post_id, $file_name);
@@ -672,8 +672,8 @@ if (! class_exists('GS_Sheet_Manager')) {
                 array(
                     'post'                    => $post_id,
                     'action'                  => 'edit',
-                    'post_type'               => 'gs_sheet_manager',
-                    'gs_sheet_manager_message' => 'delete_success',
+                    'post_type'               => 'ndr_datalist_source',
+                    'ndr_datalist_message' => 'delete_success',
                 ),
                 admin_url('post.php')
             );
@@ -686,19 +686,19 @@ if (! class_exists('GS_Sheet_Manager')) {
          */
         public function handle_activate_version_action()
         {
-            if (! isset($_POST['gs_sheet_manager_activate_nonce']) || ! wp_verify_nonce(wp_unslash($_POST['gs_sheet_manager_activate_nonce']), 'gs_sheet_manager_activate')) {
-                wp_die(esc_html__('Nonce doğrulaması başarısız.', 'gs-sheet-manager'));
+            if (! isset($_POST['ndr_datalist_activate_nonce']) || ! wp_verify_nonce(wp_unslash($_POST['ndr_datalist_activate_nonce']), 'ndr_datalist_activate')) {
+                wp_die(esc_html__('Nonce doğrulaması başarısız.', 'ndr-rest-api-to-render'));
             }
 
             if (! current_user_can('manage_options')) {
-                wp_die(esc_html__('Yetkiniz yok.', 'gs-sheet-manager'));
+                wp_die(esc_html__('Yetkiniz yok.', 'ndr-rest-api-to-render'));
             }
 
             $post_id   = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0;
             $file_name = isset($_POST['file_name']) ? sanitize_file_name(wp_unslash($_POST['file_name'])) : '';
 
             if (! $post_id || empty($file_name) || ! preg_match('/^dgm_\d+_v(\d+)_\d{4}-\d{2}-\d{2}_\d{6}\.json$/', $file_name, $matches)) {
-                wp_die(esc_html__('Geçersiz parametre.', 'gs-sheet-manager'));
+                wp_die(esc_html__('Geçersiz parametre.', 'ndr-rest-api-to-render'));
             }
 
             $version_num = absint($matches[1]);
@@ -718,19 +718,19 @@ if (! class_exists('GS_Sheet_Manager')) {
             $latest_file = trailingslashit($dir) . 'latest.json';
             $data_file   = trailingslashit($dir) . 'data.json';
             if (! $wp_filesystem->put_contents($latest_file, $content, FS_CHMOD_FILE)) {
-                $this->redirect_with_message($post_id, 'save_error', __('Latest dosyası güncellenemedi.', 'gs-sheet-manager'));
+                $this->redirect_with_message($post_id, 'save_error', __('Latest dosyası güncellenemedi.', 'ndr-rest-api-to-render'));
             }
             $wp_filesystem->put_contents($data_file, $content, FS_CHMOD_FILE);
 
-            update_post_meta($post_id, '_gs_active_version', $version_num);
+            update_post_meta($post_id, '_ndr_datalist_active_version', $version_num);
 
             $redirect_url = add_query_arg(
                 array(
                     'post'                       => $post_id,
                     'action'                     => 'edit',
-                    'post_type'                  => 'gs_sheet_manager',
-                    'gs_sheet_manager_message'   => 'activate_success',
-                    'gs_sheet_manager_version'   => $version_num,
+                    'post_type'                  => 'ndr_datalist_source',
+                    'ndr_datalist_message'   => 'activate_success',
+                    'ndr_datalist_version'   => $version_num,
                 ),
                 admin_url('post.php')
             );
@@ -744,24 +744,24 @@ if (! class_exists('GS_Sheet_Manager')) {
          */
         public function handle_bulk_delete_versions_action()
         {
-            if (! isset($_POST['gs_sheet_manager_bulk_delete_nonce']) || ! wp_verify_nonce(wp_unslash($_POST['gs_sheet_manager_bulk_delete_nonce']), 'gs_sheet_manager_bulk_delete')) {
-                wp_die(esc_html__('Nonce doğrulaması başarısız.', 'gs-sheet-manager'));
+            if (! isset($_POST['ndr_datalist_bulk_delete_nonce']) || ! wp_verify_nonce(wp_unslash($_POST['ndr_datalist_bulk_delete_nonce']), 'ndr_datalist_bulk_delete')) {
+                wp_die(esc_html__('Nonce doğrulaması başarısız.', 'ndr-rest-api-to-render'));
             }
 
             if (! current_user_can('manage_options')) {
-                wp_die(esc_html__('Yetkiniz yok.', 'gs-sheet-manager'));
+                wp_die(esc_html__('Yetkiniz yok.', 'ndr-rest-api-to-render'));
             }
 
             $post_id    = isset($_POST['post_id']) ? absint($_POST['post_id']) : 0;
             $file_names = isset($_POST['file_names']) && is_array($_POST['file_names']) ? wp_unslash($_POST['file_names']) : array();
 
             if (! $post_id || empty($file_names)) {
-                wp_die(esc_html__('Geçersiz parametre.', 'gs-sheet-manager'));
+                wp_die(esc_html__('Geçersiz parametre.', 'ndr-rest-api-to-render'));
             }
 
-            $active_ver = absint(get_post_meta($post_id, '_gs_active_version', true));
+            $active_ver = absint(get_post_meta($post_id, '_ndr_datalist_active_version', true));
             if (empty($active_ver)) {
-                $active_ver = absint(get_post_meta($post_id, '_gs_current_version', true));
+                $active_ver = absint(get_post_meta($post_id, '_ndr_datalist_current_version', true));
             }
 
             $deleted_count = 0;
@@ -783,9 +783,9 @@ if (! class_exists('GS_Sheet_Manager')) {
                 array(
                     'post'                              => $post_id,
                     'action'                            => 'edit',
-                    'post_type'                         => 'gs_sheet_manager',
-                    'gs_sheet_manager_message'          => 'bulk_delete_success',
-                    'gs_sheet_manager_deleted_count'    => $deleted_count,
+                    'post_type'                         => 'ndr_datalist_source',
+                    'ndr_datalist_message'          => 'bulk_delete_success',
+                    'ndr_datalist_deleted_count'    => $deleted_count,
                 ),
                 admin_url('post.php')
             );
@@ -799,7 +799,7 @@ if (! class_exists('GS_Sheet_Manager')) {
         public function register_rest_routes()
         {
             register_rest_route(
-                'gs-api/v1',
+                'ndr-datalist/v1',
                 '/data/(?P<post_id>\d+)',
                 array(
                     'methods'             => 'GET',
@@ -835,7 +835,7 @@ if (! class_exists('GS_Sheet_Manager')) {
 
             $json = $this->load_json_file($post_id, $file_name);
             if (is_wp_error($json)) {
-                return new WP_Error('gs_sheet_manager_not_found', $json->get_error_message(), array('status' => 404));
+                return new WP_Error('ndr_datalist_not_found', $json->get_error_message(), array('status' => 404));
             }
 
             return rest_ensure_response(json_decode($json, true));
@@ -852,20 +852,20 @@ if (! class_exists('GS_Sheet_Manager')) {
             $atts   = shortcode_atts(array('id' => 0), $atts, 'google_sheet');
             $post_id = absint($atts['id']);
             if (! $post_id) {
-                return esc_html__('Geçersiz Sheet ID.', 'gs-sheet-manager');
+                return esc_html__('Geçersiz Sheet ID.', 'ndr-rest-api-to-render');
             }
 
             $json = $this->load_json_file($post_id, 'latest.json');
             if (is_wp_error($json)) {
-                return '<p>' . esc_html__('Veri bulunamadı.', 'gs-sheet-manager') . '</p>';
+                return '<p>' . esc_html__('Veri bulunamadı.', 'ndr-rest-api-to-render') . '</p>';
             }
 
             $data = json_decode($json, true);
             if (empty($data) || ! is_array($data)) {
-                return '<p>' . esc_html__('Veri boş.', 'gs-sheet-manager') . '</p>';
+                return '<p>' . esc_html__('Veri boş.', 'ndr-rest-api-to-render') . '</p>';
             }
 
-            $output = '<div class="gs-sheet-manager-shortcode"><table class="wp-list-table widefat fixed striped"><thead><tr>';
+            $output = '<div class="ndr-datalist-shortcode"><table class="wp-list-table widefat fixed striped"><thead><tr>';
             $headers = array_keys(reset($data));
             foreach ($headers as $header) {
                 $output .= '<th>' . esc_html($header) . '</th>';
@@ -889,24 +889,24 @@ if (! class_exists('GS_Sheet_Manager')) {
          */
         public function admin_notices()
         {
-            if (empty($_GET['gs_sheet_manager_message'])) {
+            if (empty($_GET['ndr_datalist_message'])) {
                 return;
             }
 
-            $message_key = sanitize_text_field(wp_unslash($_GET['gs_sheet_manager_message']));
-            $ver_param = isset($_GET['gs_sheet_manager_version']) ? absint($_GET['gs_sheet_manager_version']) : 0;
-            $del_count = isset($_GET['gs_sheet_manager_deleted_count']) ? absint($_GET['gs_sheet_manager_deleted_count']) : 0;
+            $message_key = sanitize_text_field(wp_unslash($_GET['ndr_datalist_message']));
+            $ver_param = isset($_GET['ndr_datalist_version']) ? absint($_GET['ndr_datalist_version']) : 0;
+            $del_count = isset($_GET['ndr_datalist_deleted_count']) ? absint($_GET['ndr_datalist_deleted_count']) : 0;
             $messages = array(
-                'sync_success'     => __('Sheet başarıyla senkronize edildi ve yeni versiyon yayına alındı.', 'gs-sheet-manager'),
-                'activate_success' => $ver_param ? sprintf(__('v%d versiyonu başarıyla yayına alındı. REST API ve kısa kod artık bu veriyi sunuyor.', 'gs-sheet-manager'), $ver_param) : __('Seçilen versiyon yayına alındı.', 'gs-sheet-manager'),
-                'delete_success'      => __('Versiyon dosyası silindi.', 'gs-sheet-manager'),
-                'bulk_delete_success' => sprintf(__('%d adet versiyon dosyası başarıyla silindi.', 'gs-sheet-manager'), $del_count),
-                'missing_data'     => __('URL veya eşleme kuralları eksik.', 'gs-sheet-manager'),
-                'invalid_url'      => __('Geçersiz Google Sheet URL si.', 'gs-sheet-manager'),
-                'fetch_error'      => __('Google Sheet verisi alınamadı.', 'gs-sheet-manager'),
-                'no_rows'          => __('Google Sheet içinde satır bulunamadı.', 'gs-sheet-manager'),
-                'mapping_empty'    => __('Eşleme alanları aktif değil veya geçersiz.', 'gs-sheet-manager'),
-                'save_error'       => __('JSON dosyası kaydedilirken bir hata oluştu.', 'gs-sheet-manager'),
+                'sync_success'     => __('Sheet başarıyla senkronize edildi ve yeni versiyon yayına alındı.', 'ndr-rest-api-to-render'),
+                'activate_success' => $ver_param ? sprintf(__('v%d versiyonu başarıyla yayına alındı. REST API ve kısa kod artık bu veriyi sunuyor.', 'ndr-rest-api-to-render'), $ver_param) : __('Seçilen versiyon yayına alındı.', 'ndr-rest-api-to-render'),
+                'delete_success'      => __('Versiyon dosyası silindi.', 'ndr-rest-api-to-render'),
+                'bulk_delete_success' => sprintf(__('%d adet versiyon dosyası başarıyla silindi.', 'ndr-rest-api-to-render'), $del_count),
+                'missing_data'     => __('URL veya eşleme kuralları eksik.', 'ndr-rest-api-to-render'),
+                'invalid_url'      => __('Geçersiz Google Sheet URL si.', 'ndr-rest-api-to-render'),
+                'fetch_error'      => __('Google Sheet verisi alınamadı.', 'ndr-rest-api-to-render'),
+                'no_rows'          => __('Google Sheet içinde satır bulunamadı.', 'ndr-rest-api-to-render'),
+                'mapping_empty'    => __('Eşleme alanları aktif değil veya geçersiz.', 'ndr-rest-api-to-render'),
+                'save_error'       => __('JSON dosyası kaydedilirken bir hata oluştu.', 'ndr-rest-api-to-render'),
             );
 
             if (isset($messages[$message_key])) {
@@ -914,8 +914,8 @@ if (! class_exists('GS_Sheet_Manager')) {
                 echo '<div class="notice notice-' . esc_attr($type) . ' is-dismissible"><p>' . esc_html($messages[$message_key]) . '</p></div>';
             }
 
-            if (! empty($_GET['gs_sheet_manager_error'])) {
-                echo '<div class="notice notice-error is-dismissible"><p>' . esc_html(rawurldecode(wp_unslash($_GET['gs_sheet_manager_error']))) . '</p></div>';
+            if (! empty($_GET['ndr_datalist_error'])) {
+                echo '<div class="notice notice-error is-dismissible"><p>' . esc_html(rawurldecode(wp_unslash($_GET['ndr_datalist_error']))) . '</p></div>';
             }
         }
 
@@ -965,12 +965,12 @@ if (! class_exists('GS_Sheet_Manager')) {
                 return $dir;
             }
 
-            $current_version = absint(get_post_meta($post_id, '_gs_current_version', true));
+            $current_version = absint(get_post_meta($post_id, '_ndr_datalist_current_version', true));
             $new_version     = $current_version + 1;
             $timestamp       = current_time('Y-m-d_His');
             $json_data       = wp_json_encode($json_array, JSON_UNESCAPED_UNICODE);
             if (false === $json_data) {
-                return new WP_Error('json_encode_failed', __('JSON kodlaması başarısız oldu.', 'gs-sheet-manager'));
+                return new WP_Error('json_encode_failed', __('JSON kodlaması başarısız oldu.', 'ndr-rest-api-to-render'));
             }
 
             $version_file = trailingslashit($dir) . sprintf('dgm_%d_v%d_%s.json', absint($post_id), $new_version, $timestamp);
@@ -981,15 +981,15 @@ if (! class_exists('GS_Sheet_Manager')) {
             global $wp_filesystem;
 
             if (! $wp_filesystem->put_contents($version_file, $json_data, FS_CHMOD_FILE)) {
-                return new WP_Error('write_failed', __('Versiyon dosyası yazılamadı.', 'gs-sheet-manager'));
+                return new WP_Error('write_failed', __('Versiyon dosyası yazılamadı.', 'ndr-rest-api-to-render'));
             }
             if (! $wp_filesystem->put_contents($latest_file, $json_data, FS_CHMOD_FILE)) {
-                return new WP_Error('latest_write_failed', __('Latest dosyası yazılamadı.', 'gs-sheet-manager'));
+                return new WP_Error('latest_write_failed', __('Latest dosyası yazılamadı.', 'ndr-rest-api-to-render'));
             }
             $wp_filesystem->put_contents($data_file, $json_data, FS_CHMOD_FILE);
 
-            update_post_meta($post_id, '_gs_current_version', $new_version);
-            update_post_meta($post_id, '_gs_active_version', $new_version);
+            update_post_meta($post_id, '_ndr_datalist_current_version', $new_version);
+            update_post_meta($post_id, '_ndr_datalist_active_version', $new_version);
             $this->cleanup_old_versions($dir, $new_version);
 
             return true;
@@ -1011,7 +1011,7 @@ if (! class_exists('GS_Sheet_Manager')) {
             }
 
             $post = get_post($post_id);
-            if (! $post || 'gs_sheet_manager' !== $post->post_type) {
+            if (! $post || 'ndr_datalist_source' !== $post->post_type) {
                 return;
             }
 
@@ -1026,7 +1026,7 @@ if (! class_exists('GS_Sheet_Manager')) {
 
             $upload_dir = wp_upload_dir();
             if (! empty($upload_dir['basedir'])) {
-                $dir = trailingslashit($upload_dir['basedir']) . 'gs-api-storage/' . absint($post_id);
+                $dir = trailingslashit($upload_dir['basedir']) . 'ndr-datalist-api-storage/' . absint($post_id);
                 $this->init_filesystem();
                 global $wp_filesystem;
 
@@ -1051,13 +1051,13 @@ if (! class_exists('GS_Sheet_Manager')) {
         {
             $target_url = ($source_type === 'upload') ? trim($uploaded_url) : trim($url);
             if (empty($target_url)) {
-                return new WP_Error('empty_url', __('Lütfen geçerli bir kaynak URL veya dosya girin.', 'gs-sheet-manager'));
+                return new WP_Error('empty_url', __('Lütfen geçerli bir kaynak URL veya dosya girin.', 'ndr-rest-api-to-render'));
             }
 
             if ($source_type === 'google_sheet') {
                 $csv_url = $this->get_csv_export_url($target_url);
                 if (! $csv_url) {
-                    return new WP_Error('invalid_url', __('Geçerli bir Google Sheet URL si girin.', 'gs-sheet-manager'));
+                    return new WP_Error('invalid_url', __('Geçerli bir Google Sheet URL si girin.', 'ndr-rest-api-to-render'));
                 }
                 $content = $this->fetch_csv_content($csv_url);
                 if (is_wp_error($content)) {
@@ -1072,11 +1072,11 @@ if (! class_exists('GS_Sheet_Manager')) {
             }
             $code = wp_remote_retrieve_response_code($resp);
             if ($code < 200 || $code >= 300) {
-                return new WP_Error('http_error', sprintf(__('Veri kaynağına erişilemedi (HTTP %d).', 'gs-sheet-manager'), $code));
+                return new WP_Error('http_error', sprintf(__('Veri kaynağına erişilemedi (HTTP %d).', 'ndr-rest-api-to-render'), $code));
             }
             $body = wp_remote_retrieve_body($resp);
             if (trim($body) === '') {
-                return new WP_Error('empty_body', __('Veri kaynağı boş yanıt döndürdü.', 'gs-sheet-manager'));
+                return new WP_Error('empty_body', __('Veri kaynağı boş yanıt döndürdü.', 'ndr-rest-api-to-render'));
             }
 
             // Detect format if upload
@@ -1098,7 +1098,7 @@ if (! class_exists('GS_Sheet_Manager')) {
             if ($fmt === 'json') {
                 $decoded = json_decode($body, true);
                 if (json_last_error() !== JSON_ERROR_NONE) {
-                    return new WP_Error('json_error', __('Geçersiz JSON formatı: ', 'gs-sheet-manager') . json_last_error_msg());
+                    return new WP_Error('json_error', __('Geçersiz JSON formatı: ', 'ndr-rest-api-to-render') . json_last_error_msg());
                 }
                 return $this->normalize_json_rows($decoded);
             }
@@ -1107,13 +1107,13 @@ if (! class_exists('GS_Sheet_Manager')) {
                 libxml_use_internal_errors(true);
                 $xml = simplexml_load_string($body, 'SimpleXMLElement', LIBXML_NOCDATA);
                 if ($xml === false) {
-                    return new WP_Error('xml_error', __('Geçersiz XML formatı.', 'gs-sheet-manager'));
+                    return new WP_Error('xml_error', __('Geçersiz XML formatı.', 'ndr-rest-api-to-render'));
                 }
                 $arr = json_decode(wp_json_encode($xml), true);
                 return $this->normalize_json_rows($arr);
             }
 
-            return new WP_Error('unknown_format', __('Desteklenmeyen veri formatı.', 'gs-sheet-manager'));
+            return new WP_Error('unknown_format', __('Desteklenmeyen veri formatı.', 'ndr-rest-api-to-render'));
         }
 
         private function normalize_json_rows($data)
@@ -1236,7 +1236,7 @@ if (! class_exists('GS_Sheet_Manager')) {
 
             if (200 === $code) {
                 if (empty($body)) {
-                    return new WP_Error('empty_csv', __('CSV içeriği boş.', 'gs-sheet-manager'));
+                    return new WP_Error('empty_csv', __('CSV içeriği boş.', 'ndr-rest-api-to-render'));
                 }
                 return $body;
             }
@@ -1258,16 +1258,16 @@ if (! class_exists('GS_Sheet_Manager')) {
             }
 
             $message = sprintf(
-                __('CSV alınırken HTTP hatası oluştu. HTTP kodu: %1$s', 'gs-sheet-manager'),
+                __('CSV alınırken HTTP hatası oluştu. HTTP kodu: %1$s', 'ndr-rest-api-to-render'),
                 esc_html($code)
             );
 
             if (! empty($body_excerpt)) {
-                $message .= ' ' . sprintf(__('Sunucu yanıtı: %s', 'gs-sheet-manager'), esc_html($body_excerpt));
+                $message .= ' ' . sprintf(__('Sunucu yanıtı: %s', 'ndr-rest-api-to-render'), esc_html($body_excerpt));
             }
 
             if (is_string($body) && preg_match('/(sign in|authorization required|permission|403|404|not allowed|denied)/i', $body)) {
-                $message = __('CSV alınırken erişim hatası oluştu. Lütfen Google Sheet paylaşım ayarlarını "Herkesle paylaşıma açık" olarak kontrol edin.', 'gs-sheet-manager');
+                $message = __('CSV alınırken erişim hatası oluştu. Lütfen Google Sheet paylaşım ayarlarını "Herkesle paylaşıma açık" olarak kontrol edin.', 'ndr-rest-api-to-render');
             }
 
             return new WP_Error('http_error', $message);
@@ -1441,7 +1441,7 @@ if (! class_exists('GS_Sheet_Manager')) {
         {
             require_once ABSPATH . 'wp-admin/includes/file.php';
             if (! WP_Filesystem()) {
-                return new WP_Error('filesystem_init_failed', __('WP Filesystem başlatılamadı.', 'gs-sheet-manager'));
+                return new WP_Error('filesystem_init_failed', __('WP Filesystem başlatılamadı.', 'ndr-rest-api-to-render'));
             }
             return true;
         }
@@ -1456,10 +1456,10 @@ if (! class_exists('GS_Sheet_Manager')) {
         {
             $upload_dir = wp_upload_dir();
             if (empty($upload_dir['basedir'])) {
-                return new WP_Error('upload_dir_missing', __('Yükleme dizini alınamadı.', 'gs-sheet-manager'));
+                return new WP_Error('upload_dir_missing', __('Yükleme dizini alınamadı.', 'ndr-rest-api-to-render'));
             }
 
-            $dir = trailingslashit($upload_dir['basedir']) . 'gs-api-storage/' . absint($post_id);
+            $dir = trailingslashit($upload_dir['basedir']) . 'ndr-datalist-api-storage/' . absint($post_id);
             $this->init_filesystem();
             global $wp_filesystem;
 
@@ -1467,13 +1467,13 @@ if (! class_exists('GS_Sheet_Manager')) {
                 if (! $wp_filesystem->is_dir($dir)) {
                     if (! $wp_filesystem->mkdir($dir, FS_CHMOD_DIR)) {
                         if (! wp_mkdir_p($dir)) {
-                            return new WP_Error('mkdir_failed', __('Depolama dizini oluşturulamadı.', 'gs-sheet-manager'));
+                            return new WP_Error('mkdir_failed', __('Depolama dizini oluşturulamadı.', 'ndr-rest-api-to-render'));
                         }
                     }
                 }
             } else {
                 if (! wp_mkdir_p($dir)) {
-                    return new WP_Error('mkdir_failed', __('Depolama dizini oluşturulamadı.', 'gs-sheet-manager'));
+                    return new WP_Error('mkdir_failed', __('Depolama dizini oluşturulamadı.', 'ndr-rest-api-to-render'));
                 }
             }
 
@@ -1493,7 +1493,7 @@ if (! class_exists('GS_Sheet_Manager')) {
                 return array();
             }
 
-            $dir = trailingslashit($upload_dir['basedir']) . 'gs-api-storage/' . absint($post_id);
+            $dir = trailingslashit($upload_dir['basedir']) . 'ndr-datalist-api-storage/' . absint($post_id);
             $this->init_filesystem();
             global $wp_filesystem;
 
@@ -1550,19 +1550,19 @@ if (! class_exists('GS_Sheet_Manager')) {
         {
             $upload_dir = wp_upload_dir();
             if (empty($upload_dir['basedir'])) {
-                return new WP_Error('upload_dir_missing', __('Yükleme dizini alınamadı.', 'gs-sheet-manager'));
+                return new WP_Error('upload_dir_missing', __('Yükleme dizini alınamadı.', 'ndr-rest-api-to-render'));
             }
 
-            $dir = trailingslashit($upload_dir['basedir']) . 'gs-api-storage/' . absint($post_id);
+            $dir = trailingslashit($upload_dir['basedir']) . 'ndr-datalist-api-storage/' . absint($post_id);
             $this->init_filesystem();
             global $wp_filesystem;
 
             $file_path = trailingslashit($dir) . basename($file_name);
             if (! $wp_filesystem->exists($file_path)) {
-                return new WP_Error('file_missing', __('Dosya bulunamadı.', 'gs-sheet-manager'));
+                return new WP_Error('file_missing', __('Dosya bulunamadı.', 'ndr-rest-api-to-render'));
             }
             if (! $wp_filesystem->delete($file_path)) {
-                return new WP_Error('delete_failed', __('Dosya silinemedi.', 'gs-sheet-manager'));
+                return new WP_Error('delete_failed', __('Dosya silinemedi.', 'ndr-rest-api-to-render'));
             }
             return true;
         }
@@ -1578,10 +1578,10 @@ if (! class_exists('GS_Sheet_Manager')) {
         {
             $upload_dir = wp_upload_dir();
             if (empty($upload_dir['basedir'])) {
-                return new WP_Error('upload_dir_missing', __('Yükleme dizini alınamadı.', 'gs-sheet-manager'));
+                return new WP_Error('upload_dir_missing', __('Yükleme dizini alınamadı.', 'ndr-rest-api-to-render'));
             }
 
-            $dir = trailingslashit($upload_dir['basedir']) . 'gs-api-storage/' . absint($post_id);
+            $dir = trailingslashit($upload_dir['basedir']) . 'ndr-datalist-api-storage/' . absint($post_id);
             $this->init_filesystem();
             global $wp_filesystem;
 
@@ -1605,12 +1605,12 @@ if (! class_exists('GS_Sheet_Manager')) {
             }
 
             if (! $wp_filesystem->exists($file_path)) {
-                return new WP_Error('file_missing', __('JSON dosyası bulunamadı.', 'gs-sheet-manager'));
+                return new WP_Error('file_missing', __('JSON dosyası bulunamadı.', 'ndr-rest-api-to-render'));
             }
 
             $content = $wp_filesystem->get_contents($file_path);
             if (false === $content) {
-                return new WP_Error('read_failed', __('JSON dosyası okunamadı.', 'gs-sheet-manager'));
+                return new WP_Error('read_failed', __('JSON dosyası okunamadı.', 'ndr-rest-api-to-render'));
             }
 
             return $content;
@@ -1663,12 +1663,12 @@ if (! class_exists('GS_Sheet_Manager')) {
             $args = array(
                 'post'                    => $post_id,
                 'action'                  => 'edit',
-                'post_type'               => 'gs_sheet_manager',
-                'gs_sheet_manager_message' => $message,
+                'post_type'               => 'ndr_datalist_source',
+                'ndr_datalist_message' => $message,
             );
 
             if (! empty($error_message)) {
-                $args['gs_sheet_manager_error'] = rawurlencode($error_message);
+                $args['ndr_datalist_error'] = rawurlencode($error_message);
             }
 
             $redirect_url = add_query_arg($args, admin_url('post.php'));
